@@ -17,9 +17,13 @@
 #include <shellapi.h>
 #include <commdlg.h>
 #include <commctrl.h>
+#include <timeapi.h>
+#include <dwmapi.h>
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dwmapi.lib")
 #else
 #include <unistd.h>
 #endif
@@ -397,6 +401,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
     if(!win){fprintf(stderr,"window said no\n");SDL_Quit();return;}
     SDL_GLContext ctx = SDL_GL_CreateContext(win);
+    SDL_GL_SetSwapInterval(1); // vsync
 
     // ortho projection, y down
     glMatrixMode(GL_PROJECTION);
@@ -420,7 +425,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         cubeTex = loadTexture(path);
     } else cubeTex = loadTexture(cubeSrc);
 
-    // win32 transparency setup
+    // win32 transparency via DWM - actually works with opengl unlike colorkey lmao
 #ifdef _WIN32
     bool useTransparency = !isPreview && (g_settings.bg_mode==BG_TRANSPARENT||g_settings.bg_mode==BG_TINT||g_settings.bg_mode==BG_FADE);
     HWND sdlHwnd = nullptr;
@@ -428,11 +433,20 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         SDL_SysWMinfo wmi; SDL_VERSION(&wmi.version);
         if(SDL_GetWindowWMInfo(win,&wmi)) sdlHwnd=wmi.info.win.window;
         if(sdlHwnd) {
-            LONG style = GetWindowLong(sdlHwnd,GWL_EXSTYLE);
-            SetWindowLong(sdlHwnd,GWL_EXSTYLE,style|WS_EX_LAYERED);
-            int startAlpha = (g_settings.bg_mode==BG_FADE)?0:255;
-            SetLayeredWindowAttributes(sdlHwnd,RGB(255,0,255),startAlpha,
-                (g_settings.bg_mode==BG_TRANSPARENT||g_settings.bg_mode==BG_TINT)?LWA_COLORKEY:(LWA_COLORKEY|LWA_ALPHA));
+            // DWM blur behind = real compositor transparency
+            DWM_BLURBEHIND bb = {};
+            bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+            bb.fEnable = TRUE;
+            HRGN rgn = CreateRectRgn(0,0,-1,-1); // empty region = full window
+            bb.hRgnBlur = rgn;
+            DwmEnableBlurBehindWindow(sdlHwnd, &bb);
+            DeleteObject(rgn);
+            // also set WS_EX_LAYERED for fade mode alpha control
+            if(g_settings.bg_mode==BG_FADE) {
+                LONG style = GetWindowLong(sdlHwnd,GWL_EXSTYLE);
+                SetWindowLong(sdlHwnd,GWL_EXSTYLE,style|WS_EX_LAYERED);
+                SetLayeredWindowAttributes(sdlHwnd,0,0,LWA_ALPHA); // start invisible
+            }
         }
     }
 #endif
@@ -555,7 +569,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             if(g_settings.bg_mode==BG_FADE && !fadeDone && sdlHwnd) {
                 fadeTick++;
                 int alpha=fadeTick*255/fadeFrames; if(alpha>255)alpha=255;
-                SetLayeredWindowAttributes(sdlHwnd,RGB(255,0,255),alpha,LWA_COLORKEY|LWA_ALPHA);
+                SetLayeredWindowAttributes(sdlHwnd,0,alpha,LWA_ALPHA);
                 if(fadeTick>=fadeFrames)fadeDone=true;
             }
 #endif
@@ -563,10 +577,10 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             // draw
             int bm=g_settings.bg_mode;
             if(bm==BG_TRANSPARENT){
-                // magenta colorkey = transparent via win32 layered window
-                glClearColor(1,0,1,1); glClear(GL_COLOR_BUFFER_BIT);
+                // alpha=0 + DWM blur behind = desktop shows through
+                glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
             } else if(bm==BG_TINT){
-                glClearColor(1,0,1,1); glClear(GL_COLOR_BUFFER_BIT);
+                glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
                 glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
                 glColor4f(0,0,0,0.47f);
                 glBegin(GL_QUADS); glVertex2f(0,0);glVertex2f(W,0);glVertex2f(W,H);glVertex2f(0,H); glEnd();
@@ -632,6 +646,9 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    timeBeginPeriod(1);
+#endif
     loadCfg();
 
 #ifdef _WIN32
@@ -660,6 +677,9 @@ int main(int argc, char** argv) {
     }
     if(doConfig) runConfigTerminal();
     else runScreensaver(false,nullptr);
+#endif
+#ifdef _WIN32
+    timeEndPeriod(1);
 #endif
     return 0;
 }
