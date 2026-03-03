@@ -1,0 +1,160 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libbox2d-dev \
+            libx11-dev \
+            libxext-dev \
+            cmake \
+            build-essential \
+            zip
+
+      - name: build
+        run: |
+          mkdir build-linux && cd build-linux
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: package
+        run: |
+          mkdir -p dist-linux
+          cp build-linux/orbit_screensaver dist-linux/
+          cp orb*.png cube.png dist-linux/
+          cd dist-linux && zip -r ../orbit-linux.zip .
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-linux
+          path: orbit-linux.zip
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            mingw-w64 \
+            cmake \
+            build-essential \
+            wget \
+            unzip \
+            nsis
+
+      - name: get SDL2 mingw
+        run: |
+          wget -q https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-devel-2.30.3-mingw.tar.gz
+          tar xf SDL2-devel-2.30.3-mingw.tar.gz
+          sudo cp -r SDL2-2.30.3/x86_64-w64-mingw32/* /usr/x86_64-w64-mingw32/
+
+      - name: get SDL2_image mingw
+        run: |
+          wget -q https://github.com/libsdl-org/SDL_image/releases/download/release-2.8.2/SDL2_image-devel-2.8.2-mingw.tar.gz
+          tar xf SDL2_image-devel-2.8.2-mingw.tar.gz
+          sudo cp -r SDL2_image-2.8.2/x86_64-w64-mingw32/* /usr/x86_64-w64-mingw32/
+
+      - name: get box2d
+        run: |
+          if [ ! -d "extern/box2d" ]; then
+            mkdir -p extern
+            git clone https://github.com/erincatto/box2d --branch v2.4.1 --depth 1 extern/box2d
+          fi
+
+      - name: write toolchain
+        run: |
+          cat > mingw-toolchain.cmake << 'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
+          set(CMAKE_FIND_ROOT_PATH /usr/x86_64-w64-mingw32)
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          EOF
+
+      - name: build
+        run: |
+          mkdir build-windows && cd build-windows
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=../mingw-toolchain.cmake \
+            -DSDL2_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2 \
+            -DSDL2_image_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2_image
+          make -j$(nproc)
+
+      - name: collect files
+        run: |
+          mkdir -p dist-windows
+          cp build-windows/orbit_screensaver.exe dist-windows/orbit_screensaver.scr
+          cp /usr/x86_64-w64-mingw32/bin/SDL2.dll          dist-windows/
+          cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll    dist-windows/
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"    -exec cp {} dist-windows/ \; 2>/dev/null || true
+          find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
+          cp orb*.png cube.png dist-windows/
+
+      - name: build installer
+        run: |
+          cp installer.nsi dist-windows/
+          cd dist-windows
+          makensis installer.nsi
+          mv orbit-setup.exe ../
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-windows
+          path: orbit-setup.exe
+
+  release:
+    needs: [ build-linux, build-windows ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: orbit-linux
+          path: artifacts/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: orbit-windows
+          path: artifacts/
+
+      - name: make tag
+        id: tag
+        run: echo "tag=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: AUTOBUILD
+          body: autofuckingbuilt
+          files: |
+            artifacts/orbit-linux.zip
+            artifacts/orbit-setup.exe
