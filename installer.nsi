@@ -4,7 +4,7 @@
 Name "Orbit Screensaver"
 OutFile "orbit-setup.exe"
 InstallDir "$LOCALAPPDATA\orbit"
-RequestExecutionLevel user
+RequestExecutionLevel admin
 
 Var MesaAnswer
 
@@ -42,7 +42,7 @@ Function DonationPage
     Pop $0
     ${NSD_OnClick} $0 OpenSource
 
-    ${NSD_CreateLabel} 0 122u 100% 14u "If cant help ok"
+    ${NSD_CreateLabel} 0 122u 100% 14u "if cant its ok"
     Pop $0
 
     nsDialogs::Show
@@ -61,7 +61,7 @@ Function OpenKofi
     ExecShell "open" "https://ko-fi.com/MalikHw47"
 FunctionEnd
 Function OpenSource
-    ExecShell "open" "https://github.com/MalikHw/orbit-screensaver"
+    ExecShell "open" "https://github.com/MalikHw/orbit-screensaver-cpp"
 FunctionEnd
 
 Function MesaPage
