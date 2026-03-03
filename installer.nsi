@@ -11,7 +11,6 @@ Var MesaAnswer
 !define MUI_ABORTWARNING
 
 Page custom DonationPage
-Page custom MesaPage MesaPageLeave
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
@@ -63,28 +62,15 @@ Function OpenSource
     ExecShell "open" "https://github.com/MalikHw/orbit-screensaver-cpp"
 FunctionEnd
 
-Function MesaPage
-    nsDialogs::Create 1044
-    Pop $0
 
-    ${NSD_CreateLabel} 0 0 100% 40u "Is your PC a potato? (No dedicated GPU / very old integrated graphics)"
-    Pop $0
-    ${NSD_CreateLabel} 0 44u 100% 30u "Mesa3D adds software OpenGL - slower but works on anything."
-    Pop $0
-    ${NSD_CreateLabel} 0 78u 100% 20u "Include it?"
-    Pop $0
-
-    nsDialogs::Show
-FunctionEnd
-
-Function MesaPageLeave
-    MessageBox MB_YESNO|MB_ICONQUESTION "Include Mesa3D software renderer?$\n(Only needed if you get a black screen or missing graphics)" IDYES DoInclude IDNO Done
-    DoInclude:
-        StrCpy $MesaAnswer "yes"
-    Done:
-FunctionEnd
 
 Section "Install"
+    ; ask about mesa3d before installing
+    MessageBox MB_YESNO|MB_ICONQUESTION "Is your PC a potato? (No dedicated GPU / very old integrated graphics)$\n$\nInclude Mesa3D software OpenGL renderer?$\n(Only needed if you get a black screen or missing graphics)" IDYES DoMesa IDNO SkipMesa
+    DoMesa:
+        StrCpy $MesaAnswer "yes"
+    SkipMesa:
+
     SetOutPath "$LOCALAPPDATA\orbit"
 
     File "orbit_screensaver.exe"
@@ -107,9 +93,9 @@ Section "Install"
 
     ${If} $MesaAnswer == "yes"
         DetailPrint "Downloading Mesa3D OpenGL..."
-        NSISdl::download "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll" "$LOCALAPPDATA\orbit\opengl32.dll"
+        inetc::get /CAPTION "Downloading Mesa3D..." /BANNER "Fetching OpenGL software renderer..." "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll" "$LOCALAPPDATA\orbit\opengl32.dll" /END
         Pop $0
-        ${If} $0 != "success"
+        ${If} $0 != "OK"
             MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download Mesa3D: $0$\nYou can manually download opengl32.dll and place it in $LOCALAPPDATA\orbit\"
         ${EndIf}
     ${EndIf}
