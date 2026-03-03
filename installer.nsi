@@ -9,41 +9,40 @@ RequestExecutionLevel admin
 Var MesaAnswer
 
 !define MUI_ABORTWARNING
-!insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "English"
 
 Page custom DonationPage
 Page custom MesaPage MesaPageLeave
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
 
 Function DonationPage
     nsDialogs::Create 1044
     Pop $0
 
-    ${NSD_CreateLabel} 0 0 100% 20u "Ts so hard to make so a donnation would be a W!"
+    ${NSD_CreateLabel} 0 0 100% 24u "Ts so hard to make so a donation would be a W!"
+    Pop $0
+    ${NSD_CreateLabel} 0 26u 100% 16u "if cant its ok :)"
     Pop $0
 
-    ${NSD_CreateLink} 0 28u 100% 12u "Gift me MegaHack (discord: malikhw)"
+    ${NSD_CreateLink} 0 52u 100% 14u "Gift me MegaHack (discord: malikhw)"
     Pop $0
     ${NSD_OnClick} $0 OpenMegaHack
 
-    ${NSD_CreateLink} 0 46u 100% 12u "Get me a gift (Throne wishlist)"
+    ${NSD_CreateLink} 0 70u 100% 14u "Get me a gift (Throne wishlist)"
     Pop $0
     ${NSD_OnClick} $0 OpenThrone
 
-    ${NSD_CreateLink} 0 64u 100% 12u "Join the Discord server"
+    ${NSD_CreateLink} 0 88u 100% 14u "Join the Discord server"
     Pop $0
     ${NSD_OnClick} $0 OpenDiscord
 
-    ${NSD_CreateLink} 0 82u 100% 12u "Ko-fi donation"
+    ${NSD_CreateLink} 0 106u 100% 14u "Ko-fi donation"
     Pop $0
     ${NSD_OnClick} $0 OpenKofi
 
-    ${NSD_CreateLink} 0 100u 100% 12u "Source code on GitHub"
+    ${NSD_CreateLink} 0 124u 100% 14u "Source code on GitHub"
     Pop $0
     ${NSD_OnClick} $0 OpenSource
-
-    ${NSD_CreateLabel} 0 122u 100% 14u "if cant its ok"
-    Pop $0
 
     nsDialogs::Show
 FunctionEnd
@@ -65,26 +64,30 @@ Function OpenSource
 FunctionEnd
 
 Function MesaPage
-    IfFileExists "$EXEDIR\opengl32.dll" 0 SkipMesaPage
+    ; skip page entirely if no mesa dll in installer dir
+    IfFileExists "$EXEDIR\opengl32.dll" +2 0
+        Abort
 
     nsDialogs::Create 1044
     Pop $0
 
     ${NSD_CreateLabel} 0 0 100% 40u "Is your PC a potato? (No dedicated GPU / very old integrated graphics)"
     Pop $0
-    ${NSD_CreateLabel} 0 44u 100% 30u "Mesa3D adds software OpenGL rendering - slower but works on anything."
+    ${NSD_CreateLabel} 0 44u 100% 30u "Mesa3D adds software OpenGL - slower but works on anything."
+    Pop $0
+    ${NSD_CreateLabel} 0 78u 100% 20u "Include it?"
     Pop $0
 
     nsDialogs::Show
-    SkipMesaPage:
 FunctionEnd
 
 Function MesaPageLeave
-    IfFileExists "$EXEDIR\opengl32.dll" 0 SkipMesaLeave
-    MessageBox MB_YESNO|MB_ICONQUESTION "Include Mesa3D? (Only needed if you get a black screen or missing graphics)" IDYES DoIncludeMesa IDNO SkipMesaLeave
-    DoIncludeMesa:
+    IfFileExists "$EXEDIR\opengl32.dll" +2 0
+        Return
+    MessageBox MB_YESNO|MB_ICONQUESTION "Include Mesa3D software renderer?$\n(Only needed if you get a black screen or missing graphics)" IDYES DoInclude IDNO Done
+    DoInclude:
         StrCpy $MesaAnswer "yes"
-    SkipMesaLeave:
+    Done:
 FunctionEnd
 
 Section "Install"
