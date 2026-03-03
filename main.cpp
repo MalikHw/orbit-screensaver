@@ -586,15 +586,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
             }
 
-            // walls
-            if(!draining){
-                glColor3f(0.31f,0.31f,0.31f);glLineWidth(5);
-                glBegin(GL_LINES);
-                glVertex2f(0,H);glVertex2f(W,H);
-                glVertex2f(0,0);glVertex2f(0,H);
-                glVertex2f(W,0);glVertex2f(W,H);
-                glEnd();glColor3f(1,1,1);
-            }
+            // walls are invisible - physics only
 
             // balls
             for(auto& b:balls){
