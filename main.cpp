@@ -415,52 +415,12 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         win = SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_OPENGL);
 #endif
     } else if(useTransparency) {
-#ifdef _WIN32
-        // for transparency: create window WITHOUT opengl first so we can set pixel format before GL init
         SDL_DisplayMode dm; SDL_GetCurrentDisplayMode(0,&dm);
         W=dm.w; H=dm.h;
-        win = SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_FULLSCREEN_DESKTOP|SDL_WINDOW_BORDERLESS);
+        // SDL_WINDOW_TRANSPARENT lets SDL handle ARGB pixel format internally
+        win = SDL_CreateWindow("orbit",0,0,W,H,
+            SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN_DESKTOP|SDL_WINDOW_BORDERLESS|SDL_WINDOW_TRANSPARENT);
         SDL_ShowCursor(SDL_DISABLE);
-
-        // grab HWND before any GL context exists
-        SDL_SysWMinfo wmi; SDL_VERSION(&wmi.version);
-        SDL_GetWindowWMInfo(win,&wmi);
-        HWND sdlHwnd = wmi.info.win.window;
-
-        // set compositor-aware pixel format BEFORE creating GL context
-        HDC hdc = GetDC(sdlHwnd);
-        PIXELFORMATDESCRIPTOR pfd = {};
-        pfd.nSize = sizeof(pfd);
-        pfd.nVersion = 1;
-        pfd.dwFlags = PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL|PFD_DOUBLEBUFFER|PFD_SUPPORT_COMPOSITION;
-        pfd.iPixelType = PFD_TYPE_RGBA;
-        pfd.cColorBits = 32;
-        pfd.cAlphaBits = 8;
-        pfd.iLayerType = PFD_MAIN_PLANE;
-        int fmt = ChoosePixelFormat(hdc, &pfd);
-        SetPixelFormat(hdc, fmt, &pfd);
-
-        // create GL context manually via WGL now that pixel format is set
-        HGLRC glrc = wglCreateContext(hdc);
-        wglMakeCurrent(hdc, glrc);
-        ReleaseDC(sdlHwnd, hdc);
-
-        // NOW set up DWM transparency
-        MARGINS margins = {-1,-1,-1,-1};
-        DwmExtendFrameIntoClientArea(sdlHwnd, &margins);
-
-        if(g_settings.bg_mode==BG_BLUR) {
-            DWM_BLURBEHIND bb = {};
-            bb.dwFlags = DWM_BB_ENABLE;
-            bb.fEnable = TRUE;
-            DwmEnableBlurBehindWindow(sdlHwnd, &bb);
-        }
-        if(g_settings.bg_mode==BG_FADE) {
-            LONG style = GetWindowLong(sdlHwnd,GWL_EXSTYLE);
-            SetWindowLong(sdlHwnd,GWL_EXSTYLE,style|WS_EX_LAYERED);
-            SetLayeredWindowAttributes(sdlHwnd,0,0,LWA_ALPHA);
-        }
-#endif
     } else {
         SDL_DisplayMode dm; SDL_GetCurrentDisplayMode(0,&dm);
         W=dm.w; H=dm.h;
@@ -522,6 +482,17 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         SDL_SysWMinfo wmi2; SDL_VERSION(&wmi2.version);
         SDL_GetWindowWMInfo(win,&wmi2);
         sdlHwnd = wmi2.info.win.window;
+        if(g_settings.bg_mode==BG_BLUR) {
+            DWM_BLURBEHIND bb = {};
+            bb.dwFlags = DWM_BB_ENABLE;
+            bb.fEnable = TRUE;
+            DwmEnableBlurBehindWindow(sdlHwnd, &bb);
+        }
+        if(g_settings.bg_mode==BG_FADE) {
+            LONG style = GetWindowLong(sdlHwnd,GWL_EXSTYLE);
+            SetWindowLong(sdlHwnd,GWL_EXSTYLE,style|WS_EX_LAYERED);
+            SetLayeredWindowAttributes(sdlHwnd,0,0,LWA_ALPHA);
+        }
     }
 #endif
 
@@ -723,12 +694,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 }
             }
 
-#ifdef _WIN32
-            if(useTransparency) { HDC _hdc=GetDC(sdlHwnd); SwapBuffers(_hdc); ReleaseDC(sdlHwnd,_hdc); }
-            else SDL_GL_SwapWindow(win);
-#else
             SDL_GL_SwapWindow(win);
-#endif
 
             // cap to TICK_RATE
             Uint32 elapsed=SDL_GetTicks()-now;
