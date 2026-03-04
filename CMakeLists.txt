@@ -16,12 +16,25 @@ else()
     find_package(box2d REQUIRED)
 endif()
 
-# main screensaver
-add_executable(orbit_screensaver WIN32 main.cpp)
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/extern/imgui)
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl2.cpp
+)
+
+add_executable(orbit_screensaver WIN32 main.cpp ${IMGUI_SOURCES})
 if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
     target_sources(orbit_screensaver PRIVATE icon.rc)
 endif()
-target_include_directories(orbit_screensaver PRIVATE ${SDL2_INCLUDE_DIRS})
+target_include_directories(orbit_screensaver PRIVATE
+    ${SDL2_INCLUDE_DIRS}
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
 target_link_libraries(orbit_screensaver PRIVATE
     ${SDL2_LIBRARIES}
     SDL2_image::SDL2_image
@@ -29,18 +42,15 @@ target_link_libraries(orbit_screensaver PRIVATE
     opengl32
     shell32
     comdlg32
-    comctl32
     gdi32
     winmm
     advapi32
 )
 
-# stub scr
 add_executable(orbit_stub WIN32 stub_scr.cpp)
 target_link_libraries(orbit_stub PRIVATE shell32 advapi32)
 set_target_properties(orbit_stub PROPERTIES OUTPUT_NAME "orbit_stub")
 
-# copy assets
 set(ASSETS
     orb1.png orb2.png orb3.png orb4.png orb5.png
     orb6.png orb7.png orb8.png orb9.png orb10.png
