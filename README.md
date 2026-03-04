@@ -1,4 +1,4 @@
-<video src="showcase.mp4" autoplay loop muted></video>
+[![Watch the showcase](preview.png)](showcase.mp4)
 
 # Orbit Screensaver
 
