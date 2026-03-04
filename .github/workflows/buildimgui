@@ -1,0 +1,165 @@
+name: Build ImGui
+
+on:
+  push:
+    branches: [ imgui ]
+
+jobs:
+  build-imgui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mingw-w64 cmake build-essential wget unzip nsis
+
+      - name: get SDL2 mingw
+        run: |
+          wget -q https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-devel-2.30.3-mingw.tar.gz
+          tar xf SDL2-devel-2.30.3-mingw.tar.gz
+          sudo cp -r SDL2-2.30.3/x86_64-w64-mingw32/* /usr/x86_64-w64-mingw32/
+
+      - name: get SDL2_image mingw
+        run: |
+          wget -q https://github.com/libsdl-org/SDL_image/releases/download/release-2.8.2/SDL2_image-devel-2.8.2-mingw.tar.gz
+          tar xf SDL2_image-devel-2.8.2-mingw.tar.gz
+          sudo cp -r SDL2_image-2.8.2/x86_64-w64-mingw32/* /usr/x86_64-w64-mingw32/
+
+      - name: get box2d
+        run: |
+          if [ ! -d "extern/box2d" ]; then
+            mkdir -p extern
+            git clone https://github.com/erincatto/box2d --branch v2.4.1 --depth 1 extern/box2d
+          fi
+
+      - name: get imgui
+        run: |
+          git clone https://github.com/ocornut/imgui --depth 1 /tmp/imgui
+          mkdir -p extern/imgui/backends
+          cp /tmp/imgui/imgui.h              extern/imgui/
+          cp /tmp/imgui/imgui.cpp            extern/imgui/
+          cp /tmp/imgui/imgui_draw.cpp       extern/imgui/
+          cp /tmp/imgui/imgui_tables.cpp     extern/imgui/
+          cp /tmp/imgui/imgui_widgets.cpp    extern/imgui/
+          cp /tmp/imgui/imgui_internal.h     extern/imgui/
+          cp /tmp/imgui/imconfig.h           extern/imgui/
+          cp /tmp/imgui/imstb_rectpack.h     extern/imgui/
+          cp /tmp/imgui/imstb_textedit.h     extern/imgui/
+          cp /tmp/imgui/imstb_truetype.h     extern/imgui/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.h    extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.cpp  extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.h   extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.cpp extern/imgui/backends/
+          # main.cpp on this branch IS the imgui version
+          cp main.cpp main_imgui.cpp
+
+      - name: write toolchain
+        run: |
+          cat > mingw-toolchain.cmake << 'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
+          set(CMAKE_FIND_ROOT_PATH /usr/x86_64-w64-mingw32)
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          EOF
+
+      - name: write imgui CMakeLists
+        run: |
+          cat > CMakeLists_imgui.cmake << 'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          project(orbit_screensaver)
+          set(CMAKE_CXX_STANDARD 17)
+          set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s")
+          set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+          find_package(SDL2 REQUIRED)
+          find_package(SDL2_image QUIET)
+
+          set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+          set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+          add_subdirectory(extern/box2d)
+
+          set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/extern/imgui)
+          set(IMGUI_SOURCES
+              ${IMGUI_DIR}/imgui.cpp
+              ${IMGUI_DIR}/imgui_draw.cpp
+              ${IMGUI_DIR}/imgui_tables.cpp
+              ${IMGUI_DIR}/imgui_widgets.cpp
+              ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+              ${IMGUI_DIR}/backends/imgui_impl_opengl2.cpp
+          )
+
+          add_executable(orbit_screensaver WIN32 main_imgui.cpp ${IMGUI_SOURCES})
+          if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
+              target_sources(orbit_screensaver PRIVATE icon.rc)
+          endif()
+          target_include_directories(orbit_screensaver PRIVATE
+              ${SDL2_INCLUDE_DIRS}
+              ${IMGUI_DIR}
+              ${IMGUI_DIR}/backends
+          )
+          target_link_libraries(orbit_screensaver PRIVATE
+              ${SDL2_LIBRARIES}
+              SDL2_image::SDL2_image
+              box2d
+              opengl32
+              shell32
+              comdlg32
+              gdi32
+              winmm
+              advapi32
+          )
+
+          add_executable(orbit_stub WIN32 stub_scr.cpp)
+          target_link_libraries(orbit_stub PRIVATE shell32 advapi32)
+          set_target_properties(orbit_stub PROPERTIES OUTPUT_NAME "orbit_stub")
+
+          set(ASSETS orb1.png orb2.png orb3.png orb4.png orb5.png orb6.png orb7.png orb8.png orb9.png orb10.png cube.png)
+          foreach(ASSET ${ASSETS})
+              if(EXISTS "${CMAKE_SOURCE_DIR}/${ASSET}")
+                  add_custom_command(TARGET orbit_screensaver POST_BUILD
+                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                          "${CMAKE_SOURCE_DIR}/${ASSET}"
+                          "$<TARGET_FILE_DIR:orbit_screensaver>/${ASSET}")
+              endif()
+          endforeach()
+          EOF
+          cp CMakeLists_imgui.cmake CMakeLists.txt
+
+      - name: build
+        run: |
+          mkdir build-imgui && cd build-imgui
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=../mingw-toolchain.cmake \
+            -DSDL2_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2 \
+            -DSDL2_image_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2_image
+          make -j$(nproc)
+
+      - name: collect files
+        run: |
+          mkdir -p dist-imgui
+          cp build-imgui/orbit_screensaver.exe dist-imgui/orbit_screensaver.exe
+          cp build-imgui/orbit_stub.exe        dist-imgui/orbit_stub.scr
+          cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist-imgui/
+          cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist-imgui/
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll" -exec cp {} dist-imgui/ \; 2>/dev/null || true
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"    -exec cp {} dist-imgui/ \; 2>/dev/null || true
+          find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist-imgui/ \; 2>/dev/null || true
+          cp orb*.png cube.png dist-imgui/
+          [ -f opengl32.dll ] && cp opengl32.dll dist-imgui/ || true
+          cd dist-imgui && zip -r ../orbit-imgui-build.zip .
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-imgui
+          path: orbit-imgui-build.zip
+          retention-days: 30
