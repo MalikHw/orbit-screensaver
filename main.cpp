@@ -1,5 +1,3 @@
-// main2.cpp - Dear ImGui settings UI version
-// Requires: imgui + imgui_impl_sdl2 + imgui_impl_opengl2 in extern/imgui/
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_image.h>
@@ -107,7 +105,15 @@ static void saveCfg() {
 static unsigned char* captureDesktop(int* outW, int* outH) {
     int W=GetSystemMetrics(SM_CXSCREEN), H=GetSystemMetrics(SM_CYSCREEN);
     *outW=W; *outH=H;
-    HDC screenDC=GetDC(NULL), memDC=CreateCompatibleDC(screenDC);
+    // open the actual user desktop explicitly, not the screensaver desktop
+    HDESK hDesk = OpenDesktopA("Default", 0, FALSE, GENERIC_READ);
+    HDC screenDC = GetDCEx(GetDesktopWindow(), NULL, DCX_WINDOW);
+    if(hDesk) {
+        SetThreadDesktop(hDesk);
+        ReleaseDC(NULL, screenDC);
+        screenDC = GetDC(NULL);
+    }
+    HDC memDC=CreateCompatibleDC(screenDC);
     BITMAPINFO bmi={}; bmi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biWidth=W; bmi.bmiHeader.biHeight=-H;
     bmi.bmiHeader.biPlanes=1; bmi.bmiHeader.biBitCount=32;
@@ -121,6 +127,7 @@ static unsigned char* captureDesktop(int* outW, int* outH) {
     unsigned char* src2=(unsigned char*)bits;
     for(int i=0;i<W*H;i++){pixels[i*4+0]=src2[i*4+2];pixels[i*4+1]=src2[i*4+1];pixels[i*4+2]=src2[i*4+0];pixels[i*4+3]=255;}
     DeleteObject(bmp); DeleteDC(memDC); ReleaseDC(NULL,screenDC);
+    if(hDesk) CloseDesktop(hDesk);
     return pixels;
 }
 static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
