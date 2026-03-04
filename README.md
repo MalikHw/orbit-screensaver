@@ -1,7 +1,8 @@
-[![Orbit Screensaver Showcase](https://img.youtube.com/vi/sLoUGocFqqk/maxresdefault.jpg)](https://youtu.be/sLoUGocFqqk)
-
 # Orbit Screensaver
 
+[![Orbit Screensaver Showcase](https://img.youtube.com/vi/sLoUGocFqqk/maxresdefault.jpg)](https://youtu.be/sLoUGocFqqk)
+(click for vid)
+---
 ![Stars](https://img.shields.io/badge/stars-1-blue)
 ![C++](https://img.shields.io/badge/language-C%2B%2B-red)
 ![Status](https://img.shields.io/badge/status-why--does--this--exist-lightgrey)
