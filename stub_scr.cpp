@@ -4,6 +4,8 @@
 #include <cstdio>
 #pragma comment(lib, "shell32.lib")
 
+
+
 // tiny stub - windows calls this .scr, we just forward to the real exe in appdata
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int) {
     // find real exe
@@ -35,8 +37,10 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int) {
 
     STARTUPINFOA si={sizeof(si)};
     PROCESS_INFORMATION pi={};
-    CreateProcessA(NULL,fullCmd,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
-    if(pi.hProcess) CloseHandle(pi.hProcess);
-    if(pi.hThread)  CloseHandle(pi.hThread);
-    return 0;
+    CreateProcessA(NULL, fullCmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    if(pi.hProcess) {
+        WaitForSingleObject(pi.hProcess, INFINITE); // keep stub alive
+        CloseHandle(pi.hProcess);
+    }
+    if(pi.hThread) CloseHandle(pi.hThread);
 }
