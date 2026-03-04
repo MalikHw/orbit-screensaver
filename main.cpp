@@ -349,12 +349,14 @@ static bool runImGuiSettings() {
         }
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-        ImGui::Text("by "); ImGui::SameLine();
-        if(ImGui::SmallButton("MalikHw47")) ShellExecuteA(0,"open","https://malikhw.github.io",0,0,SW_SHOW);
-        ImGui::SameLine(); ImGui::Text("-"); ImGui::SameLine();
-        if(ImGui::SmallButton("youtube"))   ShellExecuteA(0,"open","https://youtube.com/@MalikHw47",0,0,SW_SHOW);
-        ImGui::SameLine(); ImGui::Text("-"); ImGui::SameLine();
-        if(ImGui::SmallButton("github"))    ShellExecuteA(0,"open","https://github.com/MalikHw",0,0,SW_SHOW);
+        ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
+        ImGui::Spacing();
+        if(ImGui::Button("Join my server",ImVec2(180,22)))   ShellExecuteA(0,"open","https://discord.gg/G9bZ92eg2n",0,0,SW_SHOW);
+        ImGui::SameLine();
+        if(ImGui::Button("Get me a gift!",ImVec2(150,22)))   ShellExecuteA(0,"open","https://throne.com/MalikHw47",0,0,SW_SHOW);
+        if(ImGui::Button("Get me MegaHack!",ImVec2(180,22))) ShellExecuteA(0,"open","https://absolllute.com/store/mega_hack?gift=1",0,0,SW_SHOW);
+        ImGui::SameLine();
+        if(ImGui::Button("Donate!",ImVec2(150,22)))           ShellExecuteA(0,"open","https://ko-fi.com/malikhw47",0,0,SW_SHOW);
 
         ImGui::End();
         ImGui::Render();
