@@ -1,3 +1,5 @@
+// main2.cpp - Dear ImGui settings UI version
+// Requires: imgui + imgui_impl_sdl2 + imgui_impl_opengl2 in extern/imgui/
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_image.h>
@@ -15,14 +17,15 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <commdlg.h>
-#include <commctrl.h>
 #include <timeapi.h>
 #pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "comdlg32.lib")
-#pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "advapi32.lib")
 #include <SDL2/SDL_syswm.h>
+
+#include "imgui.h"
+#include "backends/imgui_impl_sdl2.h"
+#include "backends/imgui_impl_opengl2.h"
 
 // bg modes
 #define BG_BLACK     0
@@ -45,13 +48,13 @@ struct Settings {
     int      speed;
     int      fps;
     int      bg_mode;
-    COLORREF bg_color;
+    float    bg_color[3]; // ImGui uses float[3] for colors
     char     bg_image[512];
     int      bg_fit;
     char     cube_path[512];
     bool     no_ground;
 };
-static Settings g_settings = { 10, 60, BG_BLACK, RGB(30,30,30), "", FIT_STRETCH, "", false };
+static Settings g_settings = { 10, 60, BG_BLACK, {0.12f,0.12f,0.12f}, "", FIT_STRETCH, "", false };
 
 static std::string getCfgPath() {
     char path[MAX_PATH];
@@ -75,15 +78,15 @@ static void loadCfg() {
     FILE* f=fopen(getCfgPath().c_str(),"r"); if(!f)return;
     char line[640];
     while(fgets(line,sizeof(line),f)){
-        int iv; char sv[512]; unsigned int uv;
+        int iv; char sv[512]; float fv,fv2,fv3;
         if(sscanf(line,"speed=%d",&iv)==1)           g_settings.speed=iv;
         if(sscanf(line,"fps=%d",&iv)==1)              g_settings.fps=iv;
         if(sscanf(line,"bg_mode=%d",&iv)==1)          g_settings.bg_mode=iv;
-        if(sscanf(line,"bg_color=%u",&uv)==1)         g_settings.bg_color=(COLORREF)uv;
+        if(sscanf(line,"bg_color=%f,%f,%f",&fv,&fv2,&fv3)==3){g_settings.bg_color[0]=fv;g_settings.bg_color[1]=fv2;g_settings.bg_color[2]=fv3;}
         if(sscanf(line,"bg_fit=%d",&iv)==1)           g_settings.bg_fit=iv;
         if(sscanf(line,"no_ground=%d",&iv)==1)        g_settings.no_ground=(iv!=0);
-        if(sscanf(line,"bg_image=%511[^\n]",sv)==1)  strncpy(g_settings.bg_image,sv,511);
-        if(sscanf(line,"cube_path=%511[^\n]",sv)==1) strncpy(g_settings.cube_path,sv,511);
+        if(sscanf(line,"bg_image=%511[^\n]",sv)==1)   strncpy(g_settings.bg_image,sv,511);
+        if(sscanf(line,"cube_path=%511[^\n]",sv)==1)  strncpy(g_settings.cube_path,sv,511);
     }
     fclose(f);
 }
@@ -92,7 +95,7 @@ static void saveCfg() {
     fprintf(f,"speed=%d\n",g_settings.speed);
     fprintf(f,"fps=%d\n",g_settings.fps);
     fprintf(f,"bg_mode=%d\n",g_settings.bg_mode);
-    fprintf(f,"bg_color=%u\n",(unsigned)g_settings.bg_color);
+    fprintf(f,"bg_color=%f,%f,%f\n",g_settings.bg_color[0],g_settings.bg_color[1],g_settings.bg_color[2]);
     fprintf(f,"bg_fit=%d\n",g_settings.bg_fit);
     fprintf(f,"no_ground=%d\n",(int)g_settings.no_ground);
     fprintf(f,"bg_image=%s\n",g_settings.bg_image);
@@ -101,329 +104,47 @@ static void saveCfg() {
 }
 
 // ── Desktop snapshot ──────────────────────────────────────────────────────
-// returns RGBA pixel buffer, caller frees. w/h set to screen size
 static unsigned char* captureDesktop(int* outW, int* outH) {
-    int W = GetSystemMetrics(SM_CXSCREEN);
-    int H = GetSystemMetrics(SM_CYSCREEN);
-    *outW = W; *outH = H;
-
-    HDC screenDC = GetDC(NULL);
-    HDC memDC    = CreateCompatibleDC(screenDC);
-
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth       = W;
-    bmi.bmiHeader.biHeight      = -H; // top-down
-    bmi.bmiHeader.biPlanes      = 1;
-    bmi.bmiHeader.biBitCount    = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    void* bits = nullptr;
-    HBITMAP bmp = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
-    HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
-    BitBlt(memDC, 0, 0, W, H, screenDC, 0, 0, SRCCOPY);
-    SelectObject(memDC, old);
-
-    // convert BGRA -> RGBA
-    unsigned char* pixels = (unsigned char*)malloc(W*H*4);
-    unsigned char* src2 = (unsigned char*)bits;
-    for(int i=0;i<W*H;i++){
-        pixels[i*4+0] = src2[i*4+2]; // R
-        pixels[i*4+1] = src2[i*4+1]; // G
-        pixels[i*4+2] = src2[i*4+0]; // B
-        pixels[i*4+3] = 255;
-    }
-
-    DeleteObject(bmp);
-    DeleteDC(memDC);
-    ReleaseDC(NULL, screenDC);
+    int W=GetSystemMetrics(SM_CXSCREEN), H=GetSystemMetrics(SM_CYSCREEN);
+    *outW=W; *outH=H;
+    HDC screenDC=GetDC(NULL), memDC=CreateCompatibleDC(screenDC);
+    BITMAPINFO bmi={}; bmi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth=W; bmi.bmiHeader.biHeight=-H;
+    bmi.bmiHeader.biPlanes=1; bmi.bmiHeader.biBitCount=32;
+    bmi.bmiHeader.biCompression=BI_RGB;
+    void* bits=nullptr;
+    HBITMAP bmp=CreateDIBSection(screenDC,&bmi,DIB_RGB_COLORS,&bits,NULL,0);
+    HBITMAP old=(HBITMAP)SelectObject(memDC,bmp);
+    BitBlt(memDC,0,0,W,H,screenDC,0,0,SRCCOPY);
+    SelectObject(memDC,old);
+    unsigned char* pixels=(unsigned char*)malloc(W*H*4);
+    unsigned char* src2=(unsigned char*)bits;
+    for(int i=0;i<W*H;i++){pixels[i*4+0]=src2[i*4+2];pixels[i*4+1]=src2[i*4+1];pixels[i*4+2]=src2[i*4+0];pixels[i*4+3]=255;}
+    DeleteObject(bmp); DeleteDC(memDC); ReleaseDC(NULL,screenDC);
     return pixels;
 }
-
-// simple box blur - radius in pixels, one-time cost on launch
 static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
-    unsigned char* tmp = (unsigned char*)malloc(W*H*4);
-    // horizontal pass
-    for(int y=0;y<H;y++){
-        for(int x=0;x<W;x++){
-            int r=0,g=0,b=0,cnt=0;
-            for(int k=-radius;k<=radius;k++){
-                int nx=x+k; if(nx<0||nx>=W) continue;
-                int idx=(y*W+nx)*4;
-                r+=pixels[idx]; g+=pixels[idx+1]; b+=pixels[idx+2]; cnt++;
-            }
-            int idx=(y*W+x)*4;
-            tmp[idx]=r/cnt; tmp[idx+1]=g/cnt; tmp[idx+2]=b/cnt; tmp[idx+3]=255;
-        }
+    unsigned char* tmp=(unsigned char*)malloc(W*H*4);
+    for(int y=0;y<H;y++) for(int x=0;x<W;x++){
+        int r=0,g=0,b=0,cnt=0;
+        for(int k=-radius;k<=radius;k++){int nx=x+k;if(nx<0||nx>=W)continue;int idx=(y*W+nx)*4;r+=pixels[idx];g+=pixels[idx+1];b+=pixels[idx+2];cnt++;}
+        int idx=(y*W+x)*4; tmp[idx]=r/cnt;tmp[idx+1]=g/cnt;tmp[idx+2]=b/cnt;tmp[idx+3]=255;
     }
-    // vertical pass
-    for(int y=0;y<H;y++){
-        for(int x=0;x<W;x++){
-            int r=0,g=0,b=0,cnt=0;
-            for(int k=-radius;k<=radius;k++){
-                int ny=y+k; if(ny<0||ny>=H) continue;
-                int idx=(ny*W+x)*4;
-                r+=tmp[idx]; g+=tmp[idx+1]; b+=tmp[idx+2]; cnt++;
-            }
-            int idx=(y*W+x)*4;
-            pixels[idx]=r/cnt; pixels[idx+1]=g/cnt; pixels[idx+2]=b/cnt; pixels[idx+3]=255;
-        }
+    for(int y=0;y<H;y++) for(int x=0;x<W;x++){
+        int r=0,g=0,b=0,cnt=0;
+        for(int k=-radius;k<=radius;k++){int ny=y+k;if(ny<0||ny>=H)continue;int idx=(ny*W+x)*4;r+=tmp[idx];g+=tmp[idx+1];b+=tmp[idx+2];cnt++;}
+        int idx=(y*W+x)*4; pixels[idx]=r/cnt;pixels[idx+1]=g/cnt;pixels[idx+2]=b/cnt;pixels[idx+3]=255;
     }
     free(tmp);
 }
 
-// ── Win32 settings dialog ─────────────────────────────────────────────────
-#define IDC_SPEED_SLIDER  101
-#define IDC_SPEED_LABEL   102
-#define IDC_CUBE_EDIT     103
-#define IDC_CUBE_BROWSE   104
-#define IDC_BG_BLACK      105
-#define IDC_BG_COLOR      106
-#define IDC_BG_IMAGE      107
-#define IDC_COLOR_PICK    108
-#define IDC_IMG_EDIT      109
-#define IDC_IMG_BROWSE    110
-#define IDC_FIT_STRETCH   111
-#define IDC_FIT_ZOOM      112
-#define IDC_FIT_TILE      113
-#define IDC_SAVE          114
-#define IDC_PREVIEW       115
-#define IDC_FPS_EDIT      116
-#define IDC_FPS_30        117
-#define IDC_FPS_60        118
-#define IDC_FPS_120       119
-#define IDC_FPS_144       120
-#define IDC_FPS_240       121
-#define IDC_FPS_500       122
-#define IDC_COLOR_PREVIEW 123
-#define IDC_BG_SNAPSHOT   124
-#define IDC_BG_BLUR_SNAP  125
-#define IDC_NO_GROUND     126
-
-static bool g_preview_clicked = false;
-static COLORREF g_customColors[16] = {};
-
-static LRESULT CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    switch(msg) {
-    case WM_CREATE: {
-        HFONT font = CreateFontA(14,0,0,0,FW_NORMAL,0,0,0,DEFAULT_CHARSET,
-            OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH,"Consolas");
-
-        auto mkCtrl = [&](const char* cls, const char* t, DWORD style, int id, int x, int y, int w, int h) {
-            HWND c = CreateWindowA(cls,t,WS_CHILD|WS_VISIBLE|style,x,y,w,h,hwnd,(HMENU)(intptr_t)id,0,0);
-            SendMessage(c,WM_SETFONT,(WPARAM)font,TRUE); return c;
-        };
-        auto mkLabel = [&](const char* t,int x,int y,int w,int h){ return mkCtrl("STATIC",t,0,0,x,y,w,h); };
-        auto mkBtn   = [&](const char* t,int id,int x,int y,int w,int h){ return mkCtrl("BUTTON",t,BS_PUSHBUTTON,id,x,y,w,h); };
-        auto mkRadio = [&](const char* t,int id,int x,int y,int w,int h,bool first){
-            return mkCtrl("BUTTON",t,BS_AUTORADIOBUTTON|(first?WS_GROUP:0),id,x,y,w,h);
-        };
-        auto mkCheck = [&](const char* t,int id,int x,int y,int w,int h){
-            return mkCtrl("BUTTON",t,BS_AUTOCHECKBOX,id,x,y,w,h);
-        };
-        auto mkEdit  = [&](const char* t,int id,int x,int y,int w,int h){
-            return mkCtrl("EDIT",t,WS_BORDER|ES_AUTOHSCROLL,id,x,y,w,h);
-        };
-        auto mkLink  = [&](const char* t,int id,int x,int y,int w,int h){
-            return mkCtrl("BUTTON",t,BS_OWNERDRAW,id,x,y,w,h);
-        };
-
-        int y=10;
-        mkLabel("ORBIT SCREENSAVER",10,y,280,20); y+=28;
-
-        // speed
-        mkLabel("Speed (1-20)",10,y+4,80,18);
-        HWND sl=CreateWindowA(TRACKBAR_CLASSA,"",WS_CHILD|WS_VISIBLE|TBS_HORZ|TBS_NOTICKS,
-            100,y,180,24,hwnd,(HMENU)IDC_SPEED_SLIDER,0,0);
-        SendMessage(sl,TBM_SETRANGE,TRUE,MAKELPARAM(1,20));
-        SendMessage(sl,TBM_SETPOS,TRUE,g_settings.speed);
-        SendMessage(sl,WM_SETFONT,(WPARAM)font,TRUE);
-        char spdbuf[8]; sprintf(spdbuf,"%d",g_settings.speed);
-        mkCtrl("STATIC",spdbuf,0,IDC_SPEED_LABEL,284,y+4,30,18); y+=30;
-
-        // fps
-        mkLabel("FPS",10,y+3,30,18);
-        char fpsbuf[8]; sprintf(fpsbuf,"%d",g_settings.fps);
-        mkEdit(fpsbuf,IDC_FPS_EDIT,45,y,50,22);
-        mkBtn("30", IDC_FPS_30, 100,y,32,22);
-        mkBtn("60", IDC_FPS_60, 136,y,32,22);
-        mkBtn("120",IDC_FPS_120,172,y,36,22);
-        mkBtn("144",IDC_FPS_144,212,y,36,22);
-        mkBtn("240",IDC_FPS_240,252,y,36,22);
-        mkBtn("500",IDC_FPS_500,292,y,36,22);
-        y+=30;
-
-        // cube path
-        mkLabel("Cube PNG",10,y+3,60,18);
-        mkEdit(g_settings.cube_path,IDC_CUBE_EDIT,75,y,220,22);
-        mkBtn("...",IDC_CUBE_BROWSE,300,y,30,22); y+=30;
-
-        // background
-        mkLabel("Background",10,y,80,18); y+=22;
-        mkRadio("Black",      IDC_BG_BLACK,    10,y,55,18,true);
-        mkRadio("Color",      IDC_BG_COLOR,    70,y,50,18,false);
-        CreateWindowA("STATIC","",WS_CHILD|WS_VISIBLE|SS_OWNERDRAW,
-            125,y,20,16,hwnd,(HMENU)IDC_COLOR_PREVIEW,0,0);
-        mkBtn("Pick",IDC_COLOR_PICK,150,y,38,18);
-        mkRadio("Image",      IDC_BG_IMAGE,    195,y,52,18,false);
-        mkRadio("Transparent",IDC_BG_SNAPSHOT, 252,y,90,18,false);
-        y+=22;
-        mkRadio("Blur",       IDC_BG_BLUR_SNAP,10,y,45,18,false);
-        y+=4;
-
-        // image path
-        mkEdit(g_settings.bg_image,IDC_IMG_EDIT,10,y,300,22);
-        mkBtn("...",IDC_IMG_BROWSE,316,y,30,22); y+=26;
-
-        // fit mode
-        mkLabel("Fit:",10,y,25,18);
-        mkRadio("Stretch",IDC_FIT_STRETCH,40, y,60,18,true);
-        mkRadio("Zoom",   IDC_FIT_ZOOM,  106,y,50,18,false);
-        mkRadio("Tile",   IDC_FIT_TILE,  162,y,45,18,false);
-        y+=26;
-
-        // no ground checkbox
-        HWND ng=mkCheck("No ground (infinite fall)",IDC_NO_GROUND,10,y,180,18);
-        if(g_settings.no_ground) SendMessage(ng,BM_SETCHECK,BST_CHECKED,0);
-        y+=28;
-
-        // check radios
-        int bgIds[]={IDC_BG_BLACK,IDC_BG_COLOR,IDC_BG_IMAGE,IDC_BG_SNAPSHOT,IDC_BG_BLUR_SNAP};
-        CheckDlgButton(hwnd,bgIds[g_settings.bg_mode],BST_CHECKED);
-        int fitIds[]={IDC_FIT_STRETCH,IDC_FIT_ZOOM,IDC_FIT_TILE};
-        CheckDlgButton(hwnd,fitIds[g_settings.bg_fit],BST_CHECKED);
-
-        mkBtn("Save",   IDC_SAVE,   50,y,80,26);
-        mkBtn("Preview",IDC_PREVIEW,160,y,80,26); y+=36;
-
-        // credits
-        mkLabel("by ",10,y,20,18);
-        mkLink("MalikHw47",201,30,y,70,18);
-        mkLabel("-",102,y,8,18);
-        mkLink("youtube",202,112,y,55,18);
-        mkLabel("-",169,y,8,18);
-        mkLink("github",203,179,y,50,18);
-
-        SetWindowPos(hwnd,0,0,0,360,y+55,SWP_NOMOVE|SWP_NOZORDER);
-        return 0;
-    }
-    case WM_CTLCOLORSTATIC: {
-        HWND ctrl=(HWND)lp;
-        if(GetDlgCtrlID(ctrl)==IDC_COLOR_PREVIEW){
-            HDC hdc=(HDC)wp;
-            SetBkColor(hdc,g_settings.bg_color);
-            static HBRUSH br=NULL;
-            if(br) DeleteObject(br);
-            br=CreateSolidBrush(g_settings.bg_color);
-            return (LRESULT)br;
-        }
-        return DefWindowProcA(hwnd,msg,wp,lp);
-    }
-    case WM_DRAWITEM: {
-        DRAWITEMSTRUCT* di=(DRAWITEMSTRUCT*)lp;
-        int id=di->CtlID;
-        if(id==201||id==202||id==203){
-            SetBkMode(di->hDC,TRANSPARENT);
-            SetTextColor(di->hDC,RGB(85,136,255));
-            char txt[64]; GetWindowTextA(di->hwndItem,txt,sizeof(txt));
-            DrawTextA(di->hDC,txt,-1,&di->rcItem,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
-            return TRUE;
-        }
-        return FALSE;
-    }
-    case WM_SETCURSOR: {
-        int id=GetDlgCtrlID((HWND)wp);
-        if(id==201||id==202||id==203){SetCursor(LoadCursor(0,IDC_HAND));return TRUE;}
-        return DefWindowProcA(hwnd,msg,wp,lp);
-    }
-    case WM_HSCROLL: {
-        if((HWND)lp==GetDlgItem(hwnd,IDC_SPEED_SLIDER)){
-            int v=(int)SendDlgItemMessage(hwnd,IDC_SPEED_SLIDER,TBM_GETPOS,0,0);
-            char s[8]; sprintf(s,"%d",v);
-            SetDlgItemTextA(hwnd,IDC_SPEED_LABEL,s);
-        }
-        return 0;
-    }
-    case WM_COMMAND: {
-        int id=LOWORD(wp);
-        int fpsPresets[]={30,60,120,144,240,500};
-        int fpsIds[]={IDC_FPS_30,IDC_FPS_60,IDC_FPS_120,IDC_FPS_144,IDC_FPS_240,IDC_FPS_500};
-        for(int i=0;i<6;i++) if(id==fpsIds[i]){char b[8];sprintf(b,"%d",fpsPresets[i]);SetDlgItemTextA(hwnd,IDC_FPS_EDIT,b);}
-
-        if(id==IDC_CUBE_BROWSE){
-            OPENFILENAMEA ofn={};char buf[512]="";
-            ofn.lStructSize=sizeof(ofn);ofn.hwndOwner=hwnd;
-            ofn.lpstrFilter="PNG\0*.png\0All\0*.*\0";
-            ofn.lpstrFile=buf;ofn.nMaxFile=sizeof(buf);ofn.Flags=OFN_FILEMUSTEXIST;
-            if(GetOpenFileNameA(&ofn)) SetDlgItemTextA(hwnd,IDC_CUBE_EDIT,buf);
-        }
-        if(id==IDC_IMG_BROWSE){
-            OPENFILENAMEA ofn={};char buf[512]="";
-            ofn.lStructSize=sizeof(ofn);ofn.hwndOwner=hwnd;
-            ofn.lpstrFilter="Images\0*.png;*.jpg;*.bmp\0All\0*.*\0";
-            ofn.lpstrFile=buf;ofn.nMaxFile=sizeof(buf);ofn.Flags=OFN_FILEMUSTEXIST;
-            if(GetOpenFileNameA(&ofn)) SetDlgItemTextA(hwnd,IDC_IMG_EDIT,buf);
-        }
-        if(id==IDC_COLOR_PICK){
-            CHOOSECOLORA cc={};
-            cc.lStructSize=sizeof(cc);cc.hwndOwner=hwnd;
-            cc.lpCustColors=g_customColors;
-            cc.rgbResult=g_settings.bg_color;
-            cc.Flags=CC_FULLOPEN|CC_RGBINIT;
-            if(ChooseColorA(&cc)){
-                g_settings.bg_color=cc.rgbResult;
-                InvalidateRect(GetDlgItem(hwnd,IDC_COLOR_PREVIEW),NULL,TRUE);
-            }
-        }
-        if(id==201) ShellExecuteA(hwnd,"open","https://malikhw.github.io",0,0,SW_SHOW);
-        if(id==202) ShellExecuteA(hwnd,"open","https://youtube.com/@MalikHw47",0,0,SW_SHOW);
-        if(id==203) ShellExecuteA(hwnd,"open","https://github.com/MalikHw",0,0,SW_SHOW);
-        if(id==IDC_SAVE||id==IDC_PREVIEW){
-            g_settings.speed=(int)SendDlgItemMessage(hwnd,IDC_SPEED_SLIDER,TBM_GETPOS,0,0);
-            char fpstmp[16]; GetDlgItemTextA(hwnd,IDC_FPS_EDIT,fpstmp,sizeof(fpstmp));
-            int fv=atoi(fpstmp); if(fv<1)fv=1; if(fv>500)fv=500; g_settings.fps=fv;
-            char buf[512];
-            GetDlgItemTextA(hwnd,IDC_CUBE_EDIT,buf,sizeof(buf)); strncpy(g_settings.cube_path,buf,511);
-            GetDlgItemTextA(hwnd,IDC_IMG_EDIT,buf,sizeof(buf));  strncpy(g_settings.bg_image,buf,511);
-            int bgIds[]={IDC_BG_BLACK,IDC_BG_COLOR,IDC_BG_IMAGE,IDC_BG_SNAPSHOT,IDC_BG_BLUR_SNAP};
-            for(int i=0;i<5;i++) if(IsDlgButtonChecked(hwnd,bgIds[i])) g_settings.bg_mode=i;
-            int fitIds[]={IDC_FIT_STRETCH,IDC_FIT_ZOOM,IDC_FIT_TILE};
-            for(int i=0;i<3;i++) if(IsDlgButtonChecked(hwnd,fitIds[i])) g_settings.bg_fit=i;
-            g_settings.no_ground=(IsDlgButtonChecked(hwnd,IDC_NO_GROUND)==BST_CHECKED);
-            saveCfg();
-            if(id==IDC_PREVIEW){g_preview_clicked=true;DestroyWindow(hwnd);}
-            else MessageBoxA(hwnd,"Settings saved!","Orbit",MB_OK|MB_ICONINFORMATION);
-        }
-        return 0;
-    }
-    case WM_DESTROY: PostQuitMessage(0); return 0;
-    }
-    return DefWindowProcA(hwnd,msg,wp,lp);
-}
-
-static bool runWin32Settings() {
-    g_preview_clicked=false;
-    WNDCLASSA wc={};
-    wc.lpfnWndProc=SettingsDlgProc;
-    wc.lpszClassName="OrbitSettings";
-    wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);
-    wc.hCursor=LoadCursor(0,IDC_ARROW);
-    RegisterClassA(&wc);
-    HWND hwnd=CreateWindowA("OrbitSettings","Orbit Screensaver - Settings",
-        WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,
-        CW_USEDEFAULT,CW_USEDEFAULT,360,420,0,0,0,0);
-    ShowWindow(hwnd,SW_SHOW); UpdateWindow(hwnd);
-    MSG msg;
-    while(GetMessage(&msg,0,0,0)){TranslateMessage(&msg);DispatchMessage(&msg);}
-    return g_preview_clicked;
-}
 // ── Texture ───────────────────────────────────────────────────────────────
 struct Texture { GLuint id; int w,h; bool ok; };
 
 static Texture loadTexture(const char* path) {
     Texture t={0,0,0,false};
     SDL_Surface* surf=IMG_Load(path);
-    if(!surf){fprintf(stderr,"cant load %s: %s\n",path,IMG_GetError());return t;}
+    if(!surf) return t;
     SDL_Surface* conv=SDL_ConvertSurfaceFormat(surf,SDL_PIXELFORMAT_RGBA32,0);
     SDL_FreeSurface(surf); if(!conv)return t;
     glGenTextures(1,&t.id);
@@ -432,10 +153,8 @@ static Texture loadTexture(const char* path) {
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     t.w=conv->w; t.h=conv->h; t.ok=true;
-    SDL_FreeSurface(conv);
-    return t;
+    SDL_FreeSurface(conv); return t;
 }
-
 static Texture loadTextureFromPixels(unsigned char* pixels, int w, int h) {
     Texture t={0,0,0,false};
     glGenTextures(1,&t.id);
@@ -443,10 +162,8 @@ static Texture loadTextureFromPixels(unsigned char* pixels, int w, int h) {
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    t.w=w; t.h=h; t.ok=true;
-    return t;
+    t.w=w; t.h=h; t.ok=true; return t;
 }
-
 static void drawTexturedQuad(GLuint texId,float cx,float cy,float w,float h,float angleDeg) {
     glEnable(GL_TEXTURE_2D); glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -454,60 +171,201 @@ static void drawTexturedQuad(GLuint texId,float cx,float cy,float w,float h,floa
     glPushMatrix(); glTranslatef(cx,cy,0); glRotatef(-angleDeg,0,0,1);
     float hw=w/2,hh=h/2;
     glBegin(GL_QUADS);
-    glTexCoord2f(0,0);glVertex2f(-hw,-hh);
-    glTexCoord2f(1,0);glVertex2f( hw,-hh);
-    glTexCoord2f(1,1);glVertex2f( hw, hh);
-    glTexCoord2f(0,1);glVertex2f(-hw, hh);
-    glEnd();
-    glPopMatrix();
+    glTexCoord2f(0,0);glVertex2f(-hw,-hh); glTexCoord2f(1,0);glVertex2f(hw,-hh);
+    glTexCoord2f(1,1);glVertex2f(hw,hh);   glTexCoord2f(0,1);glVertex2f(-hw,hh);
+    glEnd(); glPopMatrix();
     glDisable(GL_TEXTURE_2D); glDisable(GL_BLEND);
 }
-
-static void drawBgImage(Texture& bg, int W, int H) {
+static void drawBgTex(Texture& bg, int W, int H) {
     if(!bg.ok) return;
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D,bg.id);
-    glColor4f(1,1,1,1);
-    if(g_settings.bg_fit==FIT_STRETCH) {
-        glBegin(GL_QUADS);
-        glTexCoord2f(0,0);glVertex2f(0,0);
-        glTexCoord2f(1,0);glVertex2f(W,0);
-        glTexCoord2f(1,1);glVertex2f(W,H);
-        glTexCoord2f(0,1);glVertex2f(0,H);
-        glEnd();
-    } else if(g_settings.bg_fit==FIT_ZOOM) {
-        float scaleX=(float)W/bg.w, scaleY=(float)H/bg.h;
-        float scale=fmaxf(scaleX,scaleY);
-        float dw=bg.w*scale, dh=bg.h*scale;
-        float ox=(W-dw)/2, oy=(H-dh)/2;
-        glBegin(GL_QUADS);
-        glTexCoord2f(0,0);glVertex2f(ox,oy);
-        glTexCoord2f(1,0);glVertex2f(ox+dw,oy);
-        glTexCoord2f(1,1);glVertex2f(ox+dw,oy+dh);
-        glTexCoord2f(0,1);glVertex2f(ox,oy+dh);
-        glEnd();
-    } else {
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D,bg.id); glColor4f(1,1,1,1);
+    if(g_settings.bg_fit==FIT_ZOOM){
+        float sx=(float)W/bg.w,sy=(float)H/bg.h,sc=fmaxf(sx,sy);
+        float dw=bg.w*sc,dh=bg.h*sc,ox=(W-dw)/2,oy=(H-dh)/2;
+        glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(ox,oy);glTexCoord2f(1,0);glVertex2f(ox+dw,oy);glTexCoord2f(1,1);glVertex2f(ox+dw,oy+dh);glTexCoord2f(0,1);glVertex2f(ox,oy+dh);glEnd();
+    } else if(g_settings.bg_fit==FIT_TILE){
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
-        float tx=(float)W/bg.w, ty=(float)H/bg.h;
-        glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex2f(0,0);
-        glTexCoord2f(tx,0);glVertex2f(W,0);
-        glTexCoord2f(tx,ty);glVertex2f(W,H);
-        glTexCoord2f(0,ty);glVertex2f(0,H);
-        glEnd();
+        float tx=(float)W/bg.w,ty=(float)H/bg.h;
+        glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(0,0);glTexCoord2f(tx,0);glVertex2f(W,0);glTexCoord2f(tx,ty);glVertex2f(W,H);glTexCoord2f(0,ty);glVertex2f(0,H);glEnd();
+    } else {
+        glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(0,0);glTexCoord2f(1,0);glVertex2f(W,0);glTexCoord2f(1,1);glVertex2f(W,H);glTexCoord2f(0,1);glVertex2f(0,H);glEnd();
     }
     glDisable(GL_TEXTURE_2D);
 }
-
-static void drawCircleFallback(float cx,float cy,float r) {
+static void drawCircleFallback(float cx,float cy,float r){
     glColor3f(0.39f,0.39f,0.78f);
-    glBegin(GL_TRIANGLE_FAN); glVertex2f(cx,cy);
+    glBegin(GL_TRIANGLE_FAN);glVertex2f(cx,cy);
     for(int i=0;i<=32;i++){float a=i*2*(float)M_PI/32;glVertex2f(cx+cosf(a)*r,cy+sinf(a)*r);}
-    glEnd(); glColor3f(1,1,1);
+    glEnd();glColor3f(1,1,1);
 }
 
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
+
+// ── ImGui Settings Window ─────────────────────────────────────────────────
+static bool g_preview_clicked = false;
+
+static bool runImGuiSettings() {
+    if(SDL_Init(SDL_INIT_VIDEO)<0) return false;
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
+    SDL_Window* win=SDL_CreateWindow("Orbit Screensaver - Settings",
+        SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,
+        440,480,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    SDL_GLContext ctx=SDL_GL_CreateContext(win);
+    SDL_GL_SetSwapInterval(1);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io=ImGui::GetIO();
+    io.IniFilename=nullptr;
+    // load Segoe UI from system
+    io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 16.0f);
+    if(io.Fonts->Fonts.empty()) io.Fonts->AddFontDefault(); // fallback
+
+    // Dark theme with some colour
+    ImGui::StyleColorsDark();
+    ImGuiStyle& style=ImGui::GetStyle();
+    style.WindowRounding=6; style.FrameRounding=4; style.GrabRounding=4;
+    style.Colors[ImGuiCol_Header]        =ImVec4(0.26f,0.59f,0.98f,0.4f);
+    style.Colors[ImGuiCol_HeaderHovered] =ImVec4(0.26f,0.59f,0.98f,0.6f);
+    style.Colors[ImGuiCol_Button]        =ImVec4(0.26f,0.59f,0.98f,0.5f);
+    style.Colors[ImGuiCol_ButtonHovered] =ImVec4(0.26f,0.59f,0.98f,0.8f);
+
+    ImGui_ImplSDL2_InitForOpenGL(win,ctx);
+    ImGui_ImplOpenGL2_Init();
+
+    const char* bgNames[]={"Black","Custom Color","Image","Transparent (snapshot)","Blur (snapshot)"};
+    const char* fitNames[]={"Stretch","Zoom","Tile"};
+    bool running=true;
+    g_preview_clicked=false;
+
+    while(running){
+        SDL_Event ev;
+        while(SDL_PollEvent(&ev)){
+            ImGui_ImplSDL2_ProcessEvent(&ev);
+            if(ev.type==SDL_QUIT) running=false;
+        }
+        ImGui_ImplOpenGL2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        int W,H; SDL_GetWindowSize(win,&W,&H);
+        ImGui::SetNextWindowPos(ImVec2(0,0));
+        ImGui::SetNextWindowSize(ImVec2((float)W,(float)H));
+        ImGui::Begin("##main",nullptr,
+            ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|
+            ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoScrollbar);
+
+        ImGui::TextColored(ImVec4(0.4f,0.8f,1.0f,1.0f),"ORBIT SCREENSAVER");
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // speed
+        ImGui::SliderInt("Speed",&g_settings.speed,1,20);
+
+        // fps
+        ImGui::SetNextItemWidth(80);
+        ImGui::InputInt("FPS",&g_settings.fps,0);
+        if(g_settings.fps<1)g_settings.fps=1;
+        if(g_settings.fps>500)g_settings.fps=500;
+        ImGui::SameLine();
+        int fpsPresets[]={30,60,120,144,240,500};
+        for(int fp:fpsPresets){
+            char lbl[8]; sprintf(lbl,"%d",fp);
+            if(ImGui::SmallButton(lbl)) g_settings.fps=fp;
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
+        ImGui::Spacing();
+
+        // cube path
+        ImGui::Text("Cube PNG");
+        ImGui::SetNextItemWidth(280);
+        ImGui::InputText("##cube",g_settings.cube_path,sizeof(g_settings.cube_path));
+        ImGui::SameLine();
+        if(ImGui::Button("Browse##cube")){
+            OPENFILENAMEA ofn={};char buf[512]="";
+            ofn.lStructSize=sizeof(ofn);
+            ofn.lpstrFilter="PNG\0*.png\0All\0*.*\0";
+            ofn.lpstrFile=buf;ofn.nMaxFile=sizeof(buf);ofn.Flags=OFN_FILEMUSTEXIST;
+            if(GetOpenFileNameA(&ofn)) strncpy(g_settings.cube_path,buf,511);
+        }
+        ImGui::Spacing();
+
+        // background
+        ImGui::Text("Background");
+        ImGui::SetNextItemWidth(200);
+        ImGui::Combo("##bg",&g_settings.bg_mode,bgNames,5);
+
+        if(g_settings.bg_mode==BG_COLOR){
+            ImGui::ColorEdit3("Color",&g_settings.bg_color[0]);
+        }
+        if(g_settings.bg_mode==BG_IMAGE){
+            ImGui::SetNextItemWidth(280);
+            ImGui::InputText("##img",g_settings.bg_image,sizeof(g_settings.bg_image));
+            ImGui::SameLine();
+            if(ImGui::Button("Browse##img")){
+                OPENFILENAMEA ofn={};char buf[512]="";
+                ofn.lStructSize=sizeof(ofn);
+                ofn.lpstrFilter="Images\0*.png;*.jpg;*.bmp\0All\0*.*\0";
+                ofn.lpstrFile=buf;ofn.nMaxFile=sizeof(buf);ofn.Flags=OFN_FILEMUSTEXIST;
+                if(GetOpenFileNameA(&ofn)) strncpy(g_settings.bg_image,buf,511);
+            }
+            ImGui::Text("Fit:"); ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            ImGui::Combo("##fit",&g_settings.bg_fit,fitNames,3);
+        }
+        ImGui::Spacing();
+
+        // no ground
+        ImGui::Checkbox("No ground (infinite fall)",&g_settings.no_ground);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // buttons
+        if(ImGui::Button("Save",ImVec2(100,30))){
+            saveCfg();
+            ImGui::OpenPopup("Saved");
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Preview",ImVec2(100,30))){
+            saveCfg();
+            g_preview_clicked=true;
+            running=false;
+        }
+        if(ImGui::BeginPopupModal("Saved",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::Text("Settings saved!");
+            if(ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+        ImGui::Text("by "); ImGui::SameLine();
+        if(ImGui::SmallButton("MalikHw47")) ShellExecuteA(0,"open","https://malikhw.github.io",0,0,SW_SHOW);
+        ImGui::SameLine(); ImGui::Text("-"); ImGui::SameLine();
+        if(ImGui::SmallButton("youtube"))   ShellExecuteA(0,"open","https://youtube.com/@MalikHw47",0,0,SW_SHOW);
+        ImGui::SameLine(); ImGui::Text("-"); ImGui::SameLine();
+        if(ImGui::SmallButton("github"))    ShellExecuteA(0,"open","https://github.com/MalikHw",0,0,SW_SHOW);
+
+        ImGui::End();
+        ImGui::Render();
+        glViewport(0,0,W,H);
+        glClearColor(0.1f,0.1f,0.1f,1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+        SDL_GL_SwapWindow(win);
+    }
+
+    ImGui_ImplOpenGL2_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+    SDL_GL_DeleteContext(ctx);
+    SDL_DestroyWindow(win);
+    SDL_Quit();
+    return g_preview_clicked;
+}
 
 // ── Screensaver loop ──────────────────────────────────────────────────────
 static void runScreensaver(bool isPreview, void* previewHandle) {
@@ -517,119 +375,80 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         sprintf(e,"SDL_VIDEODRIVER=windib"); putenv(e);
         sprintf(e,"SDL_WINDOWID=%llu",(unsigned long long)(uintptr_t)parentHwnd); putenv(e);
     }
-    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)<0){fprintf(stderr,"sdl init failed\n");return;}
+    // capture BEFORE SDL covers the screen
+    bool needSnap=!isPreview&&(g_settings.bg_mode==BG_SNAPSHOT||g_settings.bg_mode==BG_BLUR_SNAP);
+    unsigned char* snapPixels=nullptr; int snapW=0,snapH=0;
+    if(needSnap){
+        snapPixels=captureDesktop(&snapW,&snapH);
+        if(g_settings.bg_mode==BG_BLUR_SNAP) boxBlur(snapPixels,snapW,snapH,12);
+    }
+
+    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)<0){if(snapPixels)free(snapPixels);return;}
     IMG_Init(IMG_INIT_PNG|IMG_INIT_JPG);
 
     int W,H;
-    SDL_Window* win;
+    if(isPreview){ RECT rc;GetClientRect(parentHwnd,&rc);W=rc.right-rc.left;if(W<=0)W=152;H=rc.bottom-rc.top;if(H<=0)H=112; }
+    else { SDL_DisplayMode dm;SDL_GetCurrentDisplayMode(0,&dm);W=dm.w;H=dm.h; }
 
-    if(isPreview){
-        RECT rc; GetClientRect(parentHwnd,&rc);
-        W=rc.right-rc.left; if(W<=0)W=152;
-        H=rc.bottom-rc.top; if(H<=0)H=112;
-    } else {
-        SDL_DisplayMode dm; SDL_GetCurrentDisplayMode(0,&dm);
-        W=dm.w; H=dm.h;
-    }
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,8); SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,8); SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,8);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
 
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,8);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
-
-    if(isPreview){
-        win=SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_OPENGL);
-    } else {
-        win=SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN_DESKTOP|SDL_WINDOW_BORDERLESS);
-        SDL_ShowCursor(SDL_DISABLE);
-    }
-    if(!win){fprintf(stderr,"window failed\n");SDL_Quit();return;}
-
-    // take desktop snapshot BEFORE creating GL context covers the screen
-    Texture snapTex={0,0,0,false};
-    bool needSnap=!isPreview&&(g_settings.bg_mode==BG_SNAPSHOT||g_settings.bg_mode==BG_BLUR_SNAP);
+    SDL_Window* win=isPreview
+        ? SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_OPENGL)
+        : SDL_CreateWindow("orbit",0,0,W,H,SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN_DESKTOP|SDL_WINDOW_BORDERLESS);
+    if(!isPreview) SDL_ShowCursor(SDL_DISABLE);
+    if(!win){SDL_Quit();return;}
 
     SDL_GLContext ctx=SDL_GL_CreateContext(win);
     SDL_GL_SetSwapInterval(1);
+    glMatrixMode(GL_PROJECTION);glLoadIdentity();glOrtho(0,W,H,0,-1,1);
+    glMatrixMode(GL_MODELVIEW);glLoadIdentity();glDisable(GL_DEPTH_TEST);
 
-    glMatrixMode(GL_PROJECTION); glLoadIdentity();
-    glOrtho(0,W,H,0,-1,1);
-    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
-    glDisable(GL_DEPTH_TEST);
-
-    // load snapshot after GL context ready
-    if(needSnap){
-        int sw,sh;
-        unsigned char* pixels=captureDesktop(&sw,&sh);
-        if(g_settings.bg_mode==BG_BLUR_SNAP)
-            boxBlur(pixels,sw,sh,12); // radius 12 = nice soft blur, CPU one-time
-        snapTex=loadTextureFromPixels(pixels,sw,sh);
-        free(pixels);
+    Texture snapTex={0,0,0,false};
+    if(needSnap && snapPixels){
+        snapTex=loadTextureFromPixels(snapPixels,snapW,snapH);
+        free(snapPixels); snapPixels=nullptr;
     }
 
     std::string assetDir=getAssetDir();
     Texture orbTex[NUM_ORBS];
-    for(int i=0;i<NUM_ORBS;i++){
-        char p[600]; snprintf(p,sizeof(p),"%s/orb%d.png",assetDir.c_str(),i+1);
-        orbTex[i]=loadTexture(p);
-    }
+    for(int i=0;i<NUM_ORBS;i++){char p[600];snprintf(p,sizeof(p),"%s/orb%d.png",assetDir.c_str(),i+1);orbTex[i]=loadTexture(p);}
     Texture cubeTex={0,0,0,false};
-    {
-        const char* csrc=g_settings.cube_path[0]?g_settings.cube_path:nullptr;
-        if(!csrc){char p[600];snprintf(p,sizeof(p),"%s/cube.png",assetDir.c_str());cubeTex=loadTexture(p);}
-        else cubeTex=loadTexture(csrc);
-    }
+    {const char* cs=g_settings.cube_path[0]?g_settings.cube_path:nullptr;if(!cs){char p[600];snprintf(p,sizeof(p),"%s/cube.png",assetDir.c_str());cubeTex=loadTexture(p);}else cubeTex=loadTexture(cs);}
     Texture bgTex={0,0,0,false};
-    if(g_settings.bg_mode==BG_IMAGE&&g_settings.bg_image[0])
-        bgTex=loadTexture(g_settings.bg_image);
+    if(g_settings.bg_mode==BG_IMAGE&&g_settings.bg_image[0]) bgTex=loadTexture(g_settings.bg_image);
 
     srand((unsigned)time(nullptr));
     bool running=true;
 
     while(running){
         srand((unsigned)rand());
-
         int fps=g_settings.fps; if(fps<1)fps=1; if(fps>500)fps=500;
         float speedMult=g_settings.speed/10.0f;
-
-        b2Vec2 gravity(0.0f, 9.8f*speedMult*3.0f);
+        b2Vec2 gravity(0.0f,9.8f*speedMult*3.0f);
         b2World world(gravity);
-
         int dropTime=(int)(20.0f/speedMult); if(dropTime<1)dropTime=1;
 
         auto makeWall=[&](float x1,float y1,float x2,float y2){
-            b2BodyDef bd; bd.type=b2_staticBody;
-            b2Body* b=world.CreateBody(&bd);
-            b2EdgeShape es; es.SetTwoSided(b2Vec2(x1/PPM,y1/PPM),b2Vec2(x2/PPM,y2/PPM));
-            b2FixtureDef fd; fd.shape=&es; fd.restitution=0.5f; fd.friction=0.7f;
-            b->CreateFixture(&fd); return b;
+            b2BodyDef bd;bd.type=b2_staticBody;b2Body* b=world.CreateBody(&bd);
+            b2EdgeShape es;es.SetTwoSided(b2Vec2(x1/PPM,y1/PPM),b2Vec2(x2/PPM,y2/PPM));
+            b2FixtureDef fd;fd.shape=&es;fd.restitution=0.5f;fd.friction=0.7f;
+            b->CreateFixture(&fd);return b;
         };
-
-        // side walls always exist
-        makeWall(0,0,0,H);
-        makeWall(W,0,W,H);
-
-        // bottom wall only if ground enabled
+        makeWall(0,0,0,H); makeWall(W,0,W,H);
         b2Body* wallBottom=nullptr;
-        if(!g_settings.no_ground)
-            wallBottom=makeWall(0,H,W,H);
+        if(!g_settings.no_ground) wallBottom=makeWall(0,H,W,H);
 
         std::vector<Ball> balls;
-        int globalTime=0;
-        bool fillingDone=false, draining=false;
-
+        int globalTime=0; bool fillingDone=false,draining=false;
         SDL_Point lastMouse; SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
         int grace=60;
-        Uint32 lastTick=SDL_GetTicks();
-        float physAccum=0.0f;
-        const float physStep=1.0f/fps;
-
+        Uint32 lastTick=SDL_GetTicks(); float physAccum=0; const float physStep=1.0f/fps;
         bool simRunning=true;
+
         while(simRunning&&running){
             globalTime++;
-
             SDL_Event ev;
             while(SDL_PollEvent(&ev)){
                 if(ev.type==SDL_QUIT){running=false;simRunning=false;}
@@ -640,108 +459,70 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
-            // spawn balls
             for(int i=0;i<NUM_BALLS;i++){
                 if(globalTime==dropTime*i){
                     float radius=40+rand()%20;
-                    b2BodyDef bd; bd.type=b2_dynamicBody;
+                    b2BodyDef bd;bd.type=b2_dynamicBody;
                     bd.position.Set(((float)W*0.8f/NUM_BALLS*(1+rand()%(NUM_BALLS*2)))/PPM,-250.0f/PPM);
                     b2Body* body=world.CreateBody(&bd);
-                    b2CircleShape cs; cs.m_radius=radius/PPM;
-                    b2FixtureDef fd; fd.shape=&cs; fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
+                    b2CircleShape cs;cs.m_radius=radius/PPM;
+                    b2FixtureDef fd;fd.shape=&cs;fd.density=1.0f;fd.restitution=0.5f;fd.friction=1.0f;
                     body->CreateFixture(&fd);
                     body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                    Ball ball; ball.body=body; ball.radius=radius; ball.orbIdx=rand()%NUM_ORBS; ball.isPlayer=false;
+                    Ball ball;ball.body=body;ball.radius=radius;ball.orbIdx=rand()%NUM_ORBS;ball.isPlayer=false;
                     balls.push_back(ball);
                 }
             }
-            // player cube
             if(globalTime==50*dropTime){
-                b2BodyDef bd; bd.type=b2_dynamicBody;
-                bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
+                b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
                 b2Body* body=world.CreateBody(&bd);
-                b2PolygonShape ps; ps.SetAsBox(PLAYER_SIZE*0.5f/PPM,PLAYER_SIZE*0.5f/PPM);
-                b2FixtureDef fd; fd.shape=&ps; fd.density=1.0f; fd.restitution=0.5f; fd.friction=0.7f;
+                b2PolygonShape ps;ps.SetAsBox(PLAYER_SIZE*0.5f/PPM,PLAYER_SIZE*0.5f/PPM);
+                b2FixtureDef fd;fd.shape=&ps;fd.density=1.0f;fd.restitution=0.5f;fd.friction=0.7f;
                 body->CreateFixture(&fd);
-                Ball ball; ball.body=body; ball.radius=PLAYER_SIZE*0.5f; ball.orbIdx=0; ball.isPlayer=true;
+                Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f;ball.orbIdx=0;ball.isPlayer=true;
                 balls.push_back(ball);
             }
-
-            // drain logic - only when ground exists
             if(!g_settings.no_ground){
-                if(!fillingDone&&globalTime>NUM_BALLS*dropTime+200){
-                    fillingDone=true; draining=true;
-                    if(wallBottom) world.DestroyBody(wallBottom);
-                }
-                if(draining){
-                    bool allOff=true;
-                    for(auto& b:balls) if(b.body->GetPosition().y*PPM<H+300){allOff=false;break;}
-                    if(allOff) simRunning=false;
-                }
+                if(!fillingDone&&globalTime>NUM_BALLS*dropTime+200){fillingDone=true;draining=true;if(wallBottom)world.DestroyBody(wallBottom);}
+                if(draining){bool allOff=true;for(auto& b:balls)if(b.body->GetPosition().y*PPM<H+300){allOff=false;break;}if(allOff)simRunning=false;}
             }
-            // no_ground: balls fall forever, restart sim after a while
-            if(g_settings.no_ground&&globalTime>NUM_BALLS*dropTime+500){
-                simRunning=false;
-            }
+            if(g_settings.no_ground&&globalTime>NUM_BALLS*dropTime+500) simRunning=false;
 
-            // physics
             Uint32 now=SDL_GetTicks();
             physAccum+=(now-lastTick)/1000.0f; lastTick=now;
             while(physAccum>=physStep){world.Step(physStep,8,3);physAccum-=physStep;}
 
-            // draw background
             int bm=g_settings.bg_mode;
             if((bm==BG_SNAPSHOT||bm==BG_BLUR_SNAP)&&snapTex.ok){
-                glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT);
-                // draw snapshot stretched to screen
-                glEnable(GL_TEXTURE_2D);
-                glBindTexture(GL_TEXTURE_2D,snapTex.id);
-                glColor4f(1,1,1,1);
-                glBegin(GL_QUADS);
-                glTexCoord2f(0,0);glVertex2f(0,0);
-                glTexCoord2f(1,0);glVertex2f(W,0);
-                glTexCoord2f(1,1);glVertex2f(W,H);
-                glTexCoord2f(0,1);glVertex2f(0,H);
-                glEnd();
+                glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
+                glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,snapTex.id);glColor4f(1,1,1,1);
+                glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(0,0);glTexCoord2f(1,0);glVertex2f(W,0);glTexCoord2f(1,1);glVertex2f(W,H);glTexCoord2f(0,1);glVertex2f(0,H);glEnd();
                 glDisable(GL_TEXTURE_2D);
             } else if(bm==BG_IMAGE&&bgTex.ok){
-                glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT);
-                drawBgImage(bgTex,W,H);
+                glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);drawBgTex(bgTex,W,H);
             } else if(bm==BG_COLOR){
-                float r=GetRValue(g_settings.bg_color)/255.0f;
-                float g2=GetGValue(g_settings.bg_color)/255.0f;
-                float b2=GetBValue(g_settings.bg_color)/255.0f;
-                glClearColor(r,g2,b2,1); glClear(GL_COLOR_BUFFER_BIT);
+                glClearColor(g_settings.bg_color[0],g_settings.bg_color[1],g_settings.bg_color[2],1);glClear(GL_COLOR_BUFFER_BIT);
             } else {
-                glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT);
+                glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
             }
 
-            // draw balls
             for(auto& b:balls){
-                float px=b.body->GetPosition().x*PPM;
-                float py=b.body->GetPosition().y*PPM;
+                float px=b.body->GetPosition().x*PPM,py=b.body->GetPosition().y*PPM;
                 float ang=b.body->GetAngle()*180.0f/(float)M_PI;
                 if(b.isPlayer){
                     float s=PLAYER_SIZE;
                     if(cubeTex.ok) drawTexturedQuad(cubeTex.id,px,py,s,s,ang);
-                    else{
-                        glColor3f(0.78f,0.39f,0.39f);
-                        glPushMatrix();glTranslatef(px,py,0);glRotatef(-ang,0,0,1);
-                        float h2=s/2;
-                        glBegin(GL_QUADS);glVertex2f(-h2,-h2);glVertex2f(h2,-h2);glVertex2f(h2,h2);glVertex2f(-h2,h2);glEnd();
-                        glPopMatrix();glColor3f(1,1,1);
-                    }
+                    else{glColor3f(0.78f,0.39f,0.39f);glPushMatrix();glTranslatef(px,py,0);glRotatef(-ang,0,0,1);float h2=s/2;glBegin(GL_QUADS);glVertex2f(-h2,-h2);glVertex2f(h2,-h2);glVertex2f(h2,h2);glVertex2f(-h2,h2);glEnd();glPopMatrix();glColor3f(1,1,1);}
                 } else {
                     float d=b.radius*2;
                     if(orbTex[b.orbIdx].ok) drawTexturedQuad(orbTex[b.orbIdx].id,px,py,d,d,ang);
                     else drawCircleFallback(px,py,b.radius);
                 }
             }
-
             SDL_GL_SwapWindow(win);
             Uint32 elapsed=SDL_GetTicks()-now;
             Uint32 target=1000/fps;
-            if(elapsed<target) SDL_Delay(target-elapsed);
+            if(elapsed<target)SDL_Delay(target-elapsed);
         }
         balls.clear();
     }
@@ -750,8 +531,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     if(cubeTex.ok)glDeleteTextures(1,&cubeTex.id);
     if(bgTex.ok)glDeleteTextures(1,&bgTex.id);
     if(snapTex.ok)glDeleteTextures(1,&snapTex.id);
-    SDL_GL_DeleteContext(ctx);
-    SDL_DestroyWindow(win);
+    SDL_GL_DeleteContext(ctx); SDL_DestroyWindow(win);
     IMG_Quit(); SDL_Quit();
 }
 
@@ -766,8 +546,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     for(int i=1;i<argc;i++){
         char a[64]; WideCharToMultiByte(CP_ACP,0,wargv[i],-1,a,sizeof(a),0,0);
         for(char* p=a;*p;p++) *p=tolower(*p);
-        if(!strcmp(a,"/s")||!strcmp(a,"-s")) {}
-        else if(!strncmp(a,"/c",2)||!strncmp(a,"-c",2)) doConfig=true;
+        if(!strncmp(a,"/c",2)||!strncmp(a,"-c",2)) doConfig=true;
         else if(!strcmp(a,"/p")||!strcmp(a,"-p")){
             doPreview=true;
             if(i+1<argc){char b[32];WideCharToMultiByte(CP_ACP,0,wargv[i+1],-1,b,sizeof(b),0,0);previewHwnd=(HWND)(uintptr_t)atoll(b);}
@@ -775,7 +554,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     }
     LocalFree(wargv);
 
-    if(doConfig){ bool prev=runWin32Settings(); if(prev)runScreensaver(false,nullptr); }
+    if(doConfig){ bool prev=runImGuiSettings(); if(prev)runScreensaver(false,nullptr); }
     else if(doPreview) runScreensaver(true,(void*)previewHwnd);
     else runScreensaver(false,nullptr);
 
