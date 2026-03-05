@@ -81,8 +81,7 @@ jobs:
       - name: collect files
         run: |
           mkdir -p dist-windows
-          cp build-windows/orbit_screensaver.exe dist-windows/
-          cp build-windows/orbit_stub.exe        dist-windows/orbit_stub.scr
+          cp build-windows/orbit_screensaver.scr dist-windows/
           cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist-windows/
           cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist-windows/
           find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
