@@ -68,6 +68,7 @@ Section "Install"
         ${EndIf}
     ${EndIf}
 
+    ; open install folder and tell user to right-click install the .scr
     MessageBox MB_OK|MB_ICONINFORMATION "Installation complete!$\n$\nThe install folder will now open.$\nRight-click 'orbit_screensaver.scr' and click 'Install' to set it as your screensaver."
     Exec 'explorer.exe "$PROFILE\orbit"'
 SectionEnd
