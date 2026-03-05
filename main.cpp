@@ -1,5 +1,3 @@
-// main2.cpp - Dear ImGui settings UI version
-// Requires: imgui + imgui_impl_sdl2 + imgui_impl_opengl2 in extern/imgui/
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_image.h>
@@ -62,16 +60,10 @@ static std::string getCfgPath() {
     return std::string(path) + "\\orbit_screensaver.ini";
 }
 static std::string getAssetDir() {
-    char regPath[MAX_PATH]="";
-    DWORD sz=MAX_PATH; HKEY key;
-    if(RegOpenKeyExA(HKEY_CURRENT_USER,"Software\\Orbit",0,KEY_READ,&key)==ERROR_SUCCESS){
-        RegQueryValueExA(key,"InstallDir",0,0,(LPBYTE)regPath,&sz);
-        RegCloseKey(key);
-    }
-    if(regPath[0]) return std::string(regPath);
-    char path[MAX_PATH];
-    SHGetFolderPathA(NULL,CSIDL_LOCAL_APPDATA,NULL,0,path);
-    return std::string(path)+"\\orbit";
+    char buf[MAX_PATH];
+    GetModuleFileNameA(NULL, buf, MAX_PATH);
+    std::string s(buf);
+    return s.substr(0, s.rfind('\\'));
 }
 
 static void loadCfg() {
