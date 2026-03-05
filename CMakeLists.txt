@@ -27,6 +27,7 @@ set(IMGUI_SOURCES
 )
 
 add_executable(orbit_screensaver WIN32 main.cpp ${IMGUI_SOURCES})
+set_target_properties(orbit_screensaver PROPERTIES OUTPUT_NAME "orbit_screensaver" SUFFIX ".scr")
 if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
     target_sources(orbit_screensaver PRIVATE icon.rc)
 endif()
