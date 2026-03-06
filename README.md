@@ -7,7 +7,6 @@
 ![C++](https://img.shields.io/badge/language-C%2B%2B-red)
 ![Status](https://img.shields.io/badge/status-why--does--this--exist-lightgrey)
 ![GitHub Repo stars](https://img.shields.io/github/stars/MalikHw/orbit-screensaver)
-
 ![License](https://img.shields.io/github/license/MalikHw/orbit-screensaver) ![GitHub release](https://img.shields.io/github/v/release/MalikHw/orbit-screensaver) ![GitHub downloads](https://img.shields.io/github/downloads/MalikHw/orbit-screensaver/total) ![Windows](https://img.shields.io/badge/platform-Windows-blue?logo=windows) ![OpenGL](https://img.shields.io/badge/OpenGL-1.4+-white?logo=opengl) ![ImGui](https://img.shields.io/badge/UI-Dear%20ImGui-purple) ![Box2D](https://img.shields.io/badge/physics-Box2D-orange)
 
 a stupid (but somehow cool) screensaver inspired by Orbit  
