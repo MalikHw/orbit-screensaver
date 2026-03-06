@@ -20,26 +20,29 @@ things fall.
 balls go into a pit.  
 it looks chaotic.  
 
-i made this because why not. also OLED exists and burn-in is scary as hell.
+- i made this because why not. also OLED exists and burn-in is scary as hell.
 
 ## credits
 
 - Mindcap — for the level "Orbit" (extreme demon)
 - Hdanke — for the orbit ballpit physics
 
+## Download
+check releases
+
 ## build
 
 it's C++  
 
-compile it(read workflow pls)
-run it  
-pray it works  
+- compile it(read workflow pls)
+- run it  
+- pray it works  
 
 ## why
 
-Zoink + Orbit = BRR
-GD is good 👍👍👍
-Yes
+- Zoink verified Orbit by Mindcap = BRR
+- GD is good 👍👍👍
+- Yes
 
 ## disclaimer
 
