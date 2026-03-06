@@ -7,6 +7,8 @@ on:
 jobs:
   build-windows:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -16,6 +18,10 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y mingw-w64 cmake build-essential wget unzip nsis
+
+      - name: set version
+        id: version
+        run: echo "tag=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
       - name: get SDL2 mingw
         run: |
@@ -36,6 +42,25 @@ jobs:
             git clone https://github.com/erincatto/box2d --branch v2.4.1 --depth 1 extern/box2d
           fi
 
+      - name: get imgui
+        run: |
+          git clone https://github.com/ocornut/imgui --depth 1 /tmp/imgui
+          mkdir -p extern/imgui/backends
+          cp /tmp/imgui/imgui.h                             extern/imgui/
+          cp /tmp/imgui/imgui.cpp                           extern/imgui/
+          cp /tmp/imgui/imgui_draw.cpp                      extern/imgui/
+          cp /tmp/imgui/imgui_tables.cpp                    extern/imgui/
+          cp /tmp/imgui/imgui_widgets.cpp                   extern/imgui/
+          cp /tmp/imgui/imgui_internal.h                    extern/imgui/
+          cp /tmp/imgui/imconfig.h                          extern/imgui/
+          cp /tmp/imgui/imstb_rectpack.h                    extern/imgui/
+          cp /tmp/imgui/imstb_textedit.h                    extern/imgui/
+          cp /tmp/imgui/imstb_truetype.h                    extern/imgui/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.h          extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.cpp        extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.h       extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.cpp     extern/imgui/backends/
+
       - name: write toolchain
         run: |
           cat > mingw-toolchain.cmake << 'EOF'
@@ -49,25 +74,6 @@ jobs:
           set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
           EOF
 
-      - name: get imgui
-        run: |
-          git clone https://github.com/ocornut/imgui --depth 1 /tmp/imgui
-          mkdir -p extern/imgui/backends
-          cp /tmp/imgui/imgui.h                              extern/imgui/
-          cp /tmp/imgui/imgui.cpp                            extern/imgui/
-          cp /tmp/imgui/imgui_draw.cpp                       extern/imgui/
-          cp /tmp/imgui/imgui_tables.cpp                     extern/imgui/
-          cp /tmp/imgui/imgui_widgets.cpp                    extern/imgui/
-          cp /tmp/imgui/imgui_internal.h                     extern/imgui/
-          cp /tmp/imgui/imconfig.h                           extern/imgui/
-          cp /tmp/imgui/imstb_rectpack.h                     extern/imgui/
-          cp /tmp/imgui/imstb_textedit.h                     extern/imgui/
-          cp /tmp/imgui/imstb_truetype.h                     extern/imgui/
-          cp /tmp/imgui/backends/imgui_impl_sdl2.h           extern/imgui/backends/
-          cp /tmp/imgui/backends/imgui_impl_sdl2.cpp         extern/imgui/backends/
-          cp /tmp/imgui/backends/imgui_impl_opengl2.h        extern/imgui/backends/
-          cp /tmp/imgui/backends/imgui_impl_opengl2.cpp      extern/imgui/backends/
-
       - name: build
         run: |
           mkdir build-windows && cd build-windows
@@ -75,42 +81,48 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=../mingw-toolchain.cmake \
             -DSDL2_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2 \
-            -DSDL2_image_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2_image
+            -DSDL2_image_DIR=/usr/x86_64-w64-mingw32/lib/cmake/SDL2_image \
+            -DAPP_VERSION="${{ steps.version.outputs.tag }}"
           make -j$(nproc)
 
       - name: collect files
         run: |
           mkdir -p dist-windows
-          # cmake/mingw may output .exe regardless of SUFFIX, handle both
+          # handle mingw ignoring SUFFIX .scr
           if [ -f build-windows/orbit_screensaver.scr ]; then
             cp build-windows/orbit_screensaver.scr dist-windows/orbit_screensaver.scr
           else
             cp build-windows/orbit_screensaver.exe dist-windows/orbit_screensaver.scr
           fi
+          cp build-windows/updater.exe dist-windows/
           cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist-windows/
           cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist-windows/
           find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
           find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"    -exec cp {} dist-windows/ \; 2>/dev/null || true
           find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
           cp orb*.png cube.png dist-windows/
-          # mesa3d if present in repo
-          [ -f opengl32.dll ] && cp opengl32.dll dist-windows/ || true
 
       - name: build installer
         run: |
-          # install inetc nsis plugin for HTTPS downloads
           wget -q https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip -O /tmp/inetc.zip
           sudo unzip -o /tmp/inetc.zip Plugins/x86-unicode/INetC.dll -d /usr/share/nsis/
           cp installer.nsi dist-windows/
-          cd dist-windows
-          makensis installer.nsi
-          mv orbit-setup.exe ../
+          cd dist-windows && makensis installer.nsi
 
-      - name: upload
+      - name: package update zip
+        run: |
+          cd dist-windows
+          zip -r ../orbit-update.zip orbit_screensaver.scr updater.exe SDL2.dll SDL2_image.dll orb*.png cube.png \
+            libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll 2>/dev/null || \
+          zip -r ../orbit-update.zip orbit_screensaver.scr updater.exe SDL2.dll SDL2_image.dll orb*.png cube.png
+
+      - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: orbit-windows
-          path: orbit-setup.exe
+          path: |
+            dist-windows/orbit-setup.exe
+            orbit-update.zip
 
   release:
     needs: build-windows
@@ -123,14 +135,12 @@ jobs:
           name: orbit-windows
           path: artifacts/
 
-      - name: make tag
-        id: tag
-        run: echo "tag=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
-
       - name: release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ needs.build-windows.outputs.tag }}
           name: AUTOBUILD
           body: autofuckingbuilt
-          files: artifacts/orbit-setup.exe
+          files: |
+            artifacts/dist-windows/orbit-setup.exe
+            artifacts/orbit-update.zip
