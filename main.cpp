@@ -527,6 +527,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
         std::vector<Ball> balls;
         int globalTime=0;bool fillingDone=false,draining=false;
+        int nextSpawn=0; // index of next orb to spawn
+        bool playerSpawned=false;
         SDL_Point lastMouse;SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
         int grace=60;
         Uint32 lastTick=SDL_GetTicks();float physAccum=0;const float physStep=1.0f/fps;
@@ -544,21 +546,23 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
-            for(int i=0;i<numBalls;i++){
-                if(globalTime==dropTime*i){
-                    float radius=(40+rand()%20)*g_settings.orb_scale;
-                    b2BodyDef bd;bd.type=b2_dynamicBody;
-                    bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
-                    b2Body* body=world.CreateBody(&bd);
-                    b2CircleShape cs;cs.m_radius=radius/PPM;
-                    b2FixtureDef fd;fd.shape=&cs;fd.density=1.0f;fd.restitution=0.5f;fd.friction=1.0f;
-                    body->CreateFixture(&fd);
-                    body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                    Ball ball;ball.body=body;ball.radius=radius;ball.orbIdx=rand()%NUM_ORBS;ball.isPlayer=false;
-                    balls.push_back(ball);
-                }
+            // spawn queue: use >= so no orb is ever skipped due to missed ticks
+            // nextSpawn=0 fires on frame 1 (globalTime>=0 is always true), fixing off-by-one
+            while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
+                float radius=(40+rand()%20)*g_settings.orb_scale;
+                b2BodyDef bd;bd.type=b2_dynamicBody;
+                bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
+                b2Body* body=world.CreateBody(&bd);
+                b2CircleShape cs;cs.m_radius=radius/PPM;
+                b2FixtureDef fd;fd.shape=&cs;fd.density=1.0f;fd.restitution=0.5f;fd.friction=1.0f;
+                body->CreateFixture(&fd);
+                body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
+                Ball ball;ball.body=body;ball.radius=radius;ball.orbIdx=rand()%NUM_ORBS;ball.isPlayer=false;
+                balls.push_back(ball);
+                nextSpawn++;
             }
-            if(globalTime==50*dropTime){
+            // player cube spawns after all orbs are queued
+            if(!playerSpawned && nextSpawn >= numBalls){
                 b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
                 b2Body* body=world.CreateBody(&bd);
                 b2PolygonShape ps;ps.SetAsBox(PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM,PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM);
@@ -566,18 +570,14 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 body->CreateFixture(&fd);
                 Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f*g_settings.orb_scale;ball.orbIdx=0;ball.isPlayer=true;
                 balls.push_back(ball);
+                playerSpawned=true;
             }
 
-            // NEW - triggers once all orbs (excluding player) have spawned
-            if(!g_settings.no_ground&&!fillingDone){
-                // count only orb balls, not the player cube
-                int orbSpawned=0;
-                for(auto& b:balls) if(!b.isPlayer) orbSpawned++;
-                if(orbSpawned>=numBalls){
-                    fillingDone=true;
-                    draining=true;
-                    if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; }
-                }
+            // destroy ground once ALL orbs have spawned (exact count, player excluded)
+            if(!g_settings.no_ground&&!fillingDone && nextSpawn>=numBalls){
+                fillingDone=true;
+                draining=true;
+                if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; }
             }
             if(!g_settings.no_ground&&draining){
                 bool allOff=true;
