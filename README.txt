@@ -11,25 +11,25 @@ INSTALLATION
 2. Right-click "orbit_screensaver.scr" and click "Install"
    Windows will set it as your screensaver automatically.
 
-3. Done! Go to screensaver settings to configure timeout.
-   (Right-click desktop -> Personalize -> Lock screen -> Screen saver)
+3. Done! Go to screensaver settings to configure it.
+   (Win+I -> Personalization -> Lock screen -> Screen saver)
 
 
-POTATO PC / NO DEDICATED GPU?
+SOFTWARE/CPU RENDERING
 ------------------------------
-If you get a black screen or the screensaver doesn't show:
+(only follow if your pc is bad(showing white squares instead of orbs) or u dont want gpu usage at all)
 
 1. Download Mesa3D (software OpenGL renderer):
    https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll
 
 2. Put "opengl32.dll" in the SAME folder as orbit_screensaver.scr
 
-3. Reinstall the screensaver (right-click -> Install again)
+3. thats it, itll work
 
 
 SETTINGS
 --------
-Right-click "orbit_screensaver.scr" -> Configure
+DONT Right-click "orbit_screensaver.scr" -> Configure (broken, fixing soon)
 OR
 Go to Windows screensaver settings and click "Settings"
 
@@ -48,6 +48,8 @@ ANTIVIRUS FALSE POSITIVE?
 --------------------------
 This is open source software. If your antivirus flags it,
 scan the source code yourself or send it to an AI:
-https://github.com/MalikHw/orbit-screensaver-cpp
+https://github.com/MalikHw/orbit-screensaver
 
-=======================================
+GPL-v3
+
+MalikHw47 :3
