@@ -1,20 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
 project(orbit_screensaver)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
+if(NOT DEFINED APP_VERSION)
+    set(APP_VERSION "dev")
+endif()
+add_compile_definitions(APP_VERSION="${APP_VERSION}")
+
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image QUIET)
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/extern/box2d/CMakeLists.txt")
-    set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
-    set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-    add_subdirectory(extern/box2d)
-else()
-    find_package(box2d REQUIRED)
-endif()
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(extern/box2d)
 
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/extern/imgui)
 set(IMGUI_SOURCES
@@ -26,43 +26,30 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/backends/imgui_impl_opengl2.cpp
 )
 
+# main screensaver
 add_executable(orbit_screensaver WIN32 main.cpp ${IMGUI_SOURCES})
-set_target_properties(orbit_screensaver PROPERTIES OUTPUT_NAME "orbit_screensaver" SUFFIX ".scr")
 if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
     target_sources(orbit_screensaver PRIVATE icon.rc)
 endif()
-target_include_directories(orbit_screensaver PRIVATE
-    ${SDL2_INCLUDE_DIRS}
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
-)
+target_include_directories(orbit_screensaver PRIVATE ${SDL2_INCLUDE_DIRS} ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(orbit_screensaver PRIVATE
-    ${SDL2_LIBRARIES}
-    SDL2_image::SDL2_image
-    box2d
-    opengl32
-    shell32
-    comdlg32
-    gdi32
-    winmm
-    advapi32
-)
+    ${SDL2_LIBRARIES} SDL2_image::SDL2_image box2d
+    opengl32 shell32 comdlg32 gdi32 winmm advapi32 winhttp)
+set_target_properties(orbit_screensaver PROPERTIES OUTPUT_NAME "orbit_screensaver" SUFFIX ".scr")
 
-add_executable(orbit_stub WIN32 stub_scr.cpp)
-target_link_libraries(orbit_stub PRIVATE shell32 advapi32)
-set_target_properties(orbit_stub PROPERTIES OUTPUT_NAME "orbit_stub")
+# updater
+add_executable(updater WIN32 updater.cpp)
+if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
+    target_sources(updater PRIVATE icon.rc)
+endif()
+target_link_libraries(updater PRIVATE shell32 winhttp advapi32)
+set_target_properties(updater PROPERTIES OUTPUT_NAME "updater")
 
-set(ASSETS
-    orb1.png orb2.png orb3.png orb4.png orb5.png
-    orb6.png orb7.png orb8.png orb9.png orb10.png
-    cube.png
-)
-foreach(ASSET ${ASSETS})
+# copy assets
+foreach(ASSET orb1.png orb2.png orb3.png orb4.png orb5.png orb6.png orb7.png orb8.png orb9.png orb10.png cube.png)
     if(EXISTS "${CMAKE_SOURCE_DIR}/${ASSET}")
         add_custom_command(TARGET orbit_screensaver POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_SOURCE_DIR}/${ASSET}"
-                "$<TARGET_FILE_DIR:orbit_screensaver>/${ASSET}"
-        )
+                "${CMAKE_SOURCE_DIR}/${ASSET}" "$<TARGET_FILE_DIR:orbit_screensaver>/${ASSET}")
     endif()
 endforeach()
