@@ -31,14 +31,12 @@
 #define APP_VERSION "dev"
 #endif
 
-// bg modes
 #define BG_BLACK     0
 #define BG_COLOR     1
 #define BG_IMAGE     2
 #define BG_SNAPSHOT  3
 #define BG_BLUR_SNAP 4
 
-// fit modes
 #define FIT_STRETCH 0
 #define FIT_ZOOM    1
 #define FIT_TILE    2
@@ -60,14 +58,13 @@ struct Settings {
     int   orb_count;
     bool  auto_update_check;
     bool  auto_update_install;
-    int   cube_chance; // 0-100%
+    int   cube_chance;
 };
 static Settings g_settings = {
     10, 60, BG_BLACK, {0.12f,0.12f,0.12f}, "", FIT_STRETCH, "",
     false, 1.0f, 120, true, false, 50
 };
 
-// ── Paths ─────────────────────────────────────────────────────────────────
 static std::string getExeDir() {
     char buf[MAX_PATH]; GetModuleFileNameA(NULL,buf,MAX_PATH);
     std::string s(buf); return s.substr(0,s.rfind('\\'));
@@ -76,7 +73,6 @@ static std::string getCfgPath() {
     return getExeDir()+"\\settings.ini";
 }
 
-// ── Config ────────────────────────────────────────────────────────────────
 static void loadCfg() {
     FILE* f=fopen(getCfgPath().c_str(),"r"); if(!f)return;
     char line[640];
@@ -126,14 +122,12 @@ static std::string fetchLatestTag() {
         L"/repos/MalikHw/orbit-screensaver/releases/latest",
         NULL,WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES,WINHTTP_FLAG_SECURE);
     if(!hRequest){WinHttpCloseHandle(hConnect);WinHttpCloseHandle(hSession);return result;}
-    // github requires user-agent
     WinHttpAddRequestHeaders(hRequest,L"User-Agent: OrbitScreensaver",-1,WINHTTP_ADDREQ_FLAG_ADD);
     if(WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0,WINHTTP_NO_REQUEST_DATA,0,0,0)
        && WinHttpReceiveResponse(hRequest,NULL)){
         char buf[4096]=""; DWORD read=0;
         WinHttpReadData(hRequest,buf,sizeof(buf)-1,&read);
         buf[read]=0;
-        // parse "tag_name":"XXXXX"
         const char* p=strstr(buf,"\"tag_name\":");
         if(p){
             p+=11; while(*p=='"'||*p==' ')p++;
@@ -154,7 +148,6 @@ static void launchUpdater() {
 }
 
 static void showUpdateToast(const std::string& newTag) {
-    // simple balloon tooltip via tray — no extra deps
     NOTIFYICONDATAA nid={};
     nid.cbSize=sizeof(nid);
     nid.uFlags=NIF_INFO;
@@ -188,6 +181,7 @@ static unsigned char* captureDesktop(int* outW, int* outH) {
     if(hDesk) CloseDesktop(hDesk);
     return pixels;
 }
+// this blur runs on the CPU like a retarded dumbass
 static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
     unsigned char* tmp=(unsigned char*)malloc(W*H*4);
     for(int y=0;y<H;y++) for(int x=0;x<W;x++){
@@ -203,7 +197,6 @@ static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
     free(tmp);
 }
 
-// ── Texture ───────────────────────────────────────────────────────────────
 struct Texture { GLuint id; int w,h; bool ok; };
 static Texture loadTexture(const char* path) {
     Texture t={0,0,0,false};
@@ -262,14 +255,12 @@ static void downloadMesa3D() {
     const char* url = "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll";
     std::string destPath = getExeDir() + "\\opengl32.dll";
 
-    // confirmation popup with warning text
     int res = MessageBoxA(NULL,
         "Please Only Use when showing white square instead,\nand/or you don't want GPU usage.\n\nDownload Mesa3D software OpenGL renderer?",
         "Install Mesa3D", MB_OKCANCEL | MB_ICONINFORMATION);
     if(res != IDOK) return;
 
-    // parse url manually (reuse same logic as updater)
-    const char* host_start = url + 8; // skip https://
+    const char* host_start = url + 8;
     const char* path_start = strchr(host_start, '/');
     if(!path_start) { MessageBoxA(NULL,"Invalid URL.","Error",MB_OK|MB_ICONERROR); return; }
 
@@ -310,9 +301,9 @@ static void downloadMesa3D() {
     MessageBoxA(NULL,"Mesa3D installed successfully!\nopengl32.dll is now in your orbit folder.","Mesa3D",MB_OK|MB_ICONINFORMATION);
 }
 
-// ── ImGui MegaHack-ahh ────────────────────────────────────────────────────────
 static bool g_preview_clicked = false;
 
+// megahack ahh UI
 static bool runImGuiSettings() {
     if(SDL_Init(SDL_INIT_VIDEO)<0) return false;
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
@@ -340,7 +331,6 @@ static bool runImGuiSettings() {
     const char* bgNames[]={"Black","Custom Color","Image","Transparent (snapshot)","Blur (snapshot)"};
     const char* fitNames[]={"Stretch","Zoom","Tile"};
 
-    // update check state
     static std::string latestTag="";
     static bool updateChecked=false;
     static bool checkingNow=false;
@@ -368,10 +358,8 @@ static bool runImGuiSettings() {
         ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f),"v%s",APP_VERSION);
         ImGui::Separator(); ImGui::Spacing();
 
-        // speed
         ImGui::SliderInt("Speed",&g_settings.speed,1,20);
 
-        // fps
         ImGui::SetNextItemWidth(80);
         ImGui::InputInt("FPS",&g_settings.fps,0);
         if(g_settings.fps<1)g_settings.fps=1;if(g_settings.fps>500)g_settings.fps=500;
@@ -380,19 +368,24 @@ static bool runImGuiSettings() {
         for(int fp:fpsP){char l[8];sprintf(l,"%d",fp);if(ImGui::SmallButton(l))g_settings.fps=fp;ImGui::SameLine();}
         ImGui::NewLine(); ImGui::Spacing();
 
-        // orbs
+        static bool broPopupPending=false;
+        static bool wasOrbFieldFocused=false;
         ImGui::SetNextItemWidth(120);
         ImGui::InputInt("Orb count",&g_settings.orb_count,1);
         if(g_settings.orb_count<1)g_settings.orb_count=1;
-        if(g_settings.orb_count < 20) ImGui::OpenPopup("bro");
+        bool orbFieldFocused=ImGui::IsItemActive();
+        if(wasOrbFieldFocused && !orbFieldFocused && g_settings.orb_count < 20)
+            broPopupPending=true;
+        wasOrbFieldFocused=orbFieldFocused;
         ImGui::SameLine();
-        if(ImGui::SmallButton("Low"))  g_settings.orb_count=30;  ImGui::SameLine();
-        if(ImGui::SmallButton("Med"))  g_settings.orb_count=80;  ImGui::SameLine();
-        if(ImGui::SmallButton("High")) g_settings.orb_count=120; ImGui::SameLine();
-        if(ImGui::SmallButton("Giga")) g_settings.orb_count=210;
+        if(ImGui::SmallButton("Low"))  { g_settings.orb_count=30; }  ImGui::SameLine();
+        if(ImGui::SmallButton("Med"))  { g_settings.orb_count=80; }  ImGui::SameLine();
+        if(ImGui::SmallButton("High")) { g_settings.orb_count=120; } ImGui::SameLine();
+        if(ImGui::SmallButton("Giga")) { g_settings.orb_count=210; }
+        if(broPopupPending){ ImGui::OpenPopup("bro"); broPopupPending=false; }
 
         if(ImGui::BeginPopupModal("bro",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
-            ImGui::Text("bro what the fuck?\xF0\x9F\x98\xAD, how is even THAT!?");
+            ImGui::Text("bro what the fuck? :sob:, how is even THAT!?");
             if(ImGui::Button("yes")) ImGui::CloseCurrentPopup();
             ImGui::EndPopup();
         }
@@ -409,7 +402,6 @@ static bool runImGuiSettings() {
         ImGui::SameLine(); ImGui::TextDisabled("%%");
         ImGui::Spacing();
 
-        // cube path
         ImGui::Text("Cube PNG");
         ImGui::SetNextItemWidth(280);
         ImGui::InputText("##cube",g_settings.cube_path,sizeof(g_settings.cube_path));
@@ -422,7 +414,6 @@ static bool runImGuiSettings() {
         }
         ImGui::Spacing();
 
-        // background
         ImGui::Text("Background");
         ImGui::SetNextItemWidth(200);
         ImGui::Combo("##bg",&g_settings.bg_mode,bgNames,5);
@@ -443,11 +434,9 @@ static bool runImGuiSettings() {
         }
         ImGui::Spacing();
 
-        // no ground
         ImGui::Checkbox("No ground (infinite fall)",&g_settings.no_ground);
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
-        // update section
         ImGui::TextColored(ImVec4(0.4f,0.8f,1.0f,1.0f),"Updates");
         ImGui::Checkbox("Check for updates on launch",&g_settings.auto_update_check);
         ImGui::Checkbox("Auto install updates",&g_settings.auto_update_install);
@@ -471,7 +460,6 @@ static bool runImGuiSettings() {
         }
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
-        // save/preview
         if(ImGui::Button("Save",ImVec2(100,30))){saveCfg();ImGui::OpenPopup("Saved");}
         ImGui::SameLine();
         if(ImGui::Button("Preview",ImVec2(100,30))){saveCfg();g_preview_clicked=true;running=false;}
@@ -481,7 +469,6 @@ static bool runImGuiSettings() {
             ImGui::EndPopup();
         }
 
-        // links
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
@@ -521,7 +508,6 @@ static bool runImGuiSettings() {
     return g_preview_clicked;
 }
 
-// ── Screensaver loop ──────────────────────────────────────────────────────
 static void runScreensaver(bool isPreview, void* previewHandle) {
     HWND parentHwnd=(HWND)previewHandle;
     if(isPreview&&parentHwnd){
@@ -596,9 +582,9 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
         std::vector<Ball> balls;
         int globalTime=0;bool fillingDone=false,draining=false;
-        int nextSpawn=0; // index of next orb to spawn
+        int nextSpawn=0;
         bool playerSpawned=false;
-        Uint32 allSpawnedAt=0; // timestamp when last orb was queued
+        Uint32 allSpawnedAt=0;
         SDL_Point lastMouse;SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
         int grace=60;
         Uint32 lastTick=SDL_GetTicks();float physAccum=0;const float physStep=1.0f/fps;
@@ -616,8 +602,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
-            // spawn queue: use >= so no orb is ever skipped due to missed ticks
-            // nextSpawn=0 fires on frame 1 (globalTime>=0 is always true), fixing off-by-one
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
                 b2BodyDef bd;bd.type=b2_dynamicBody;
@@ -631,9 +615,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 balls.push_back(ball);
                 nextSpawn++;
             }
-            // player cube: spawn alongside orbs (after first few), with random chance
-            if(!playerSpawned && nextSpawn >= 1){
-                playerSpawned=true; // mark so we don't re-roll every frame
+            if(!playerSpawned && nextSpawn >= numBalls/2){
+                playerSpawned=true;
                 if((rand()%100) < g_settings.cube_chance){
                     b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
                     b2Body* body=world.CreateBody(&bd);
@@ -645,14 +628,13 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 }
             }
 
-            // destroy ground once ALL orbs have spawned, after a 5-6s delay
             if(!g_settings.no_ground&&!fillingDone && nextSpawn>=numBalls){
                 if(allSpawnedAt==0) allSpawnedAt=SDL_GetTicks();
-                Uint32 delay=5000+(rand()%1001); // 5000-6000ms
+                Uint32 delay=5000+(rand()%1001);
                 if(SDL_GetTicks()-allSpawnedAt >= delay){
                     fillingDone=true;
                     draining=true;
-                    if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; }
+                    if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; } // bye bitch
                 }
             }
             if(!g_settings.no_ground&&draining){
@@ -711,12 +693,10 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     IMG_Quit();SDL_Quit();
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     timeBeginPeriod(1);
     loadCfg();
 
-    // auto update check on launch
     if(g_settings.auto_update_check){
         std::string latest=fetchLatestTag();
         if(!latest.empty()&&latest!=APP_VERSION){
