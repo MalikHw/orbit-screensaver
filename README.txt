@@ -19,12 +19,9 @@ SOFTWARE/CPU RENDERING
 ------------------------------
 (only follow if your pc is bad(showing white squares instead of orbs) or u dont want gpu usage at all)
 
-1. Download Mesa3D (software OpenGL renderer):
-   https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll
-
-2. Put "opengl32.dll" in the SAME folder as orbit_screensaver.scr
-
-3. thats it, itll work
+1. open settings
+2. click "Install Mesa3d"
+3. thats it
 
 
 SETTINGS
