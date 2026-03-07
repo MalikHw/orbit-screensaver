@@ -34,7 +34,7 @@ endif()
 target_include_directories(orbit_screensaver PRIVATE ${SDL2_INCLUDE_DIRS} ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(orbit_screensaver PRIVATE
     ${SDL2_LIBRARIES} SDL2_image::SDL2_image box2d
-    opengl32 shell32 comdlg32 gdi32 winmm advapi32 winhttp)
+    opengl32 shell32 comdlg32 gdi32 winmm advapi32 winhttp urlmon)
 set_target_properties(orbit_screensaver PROPERTIES OUTPUT_NAME "orbit_screensaver" SUFFIX ".scr")
 
 # updater
