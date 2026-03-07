@@ -70,6 +70,9 @@ jobs:
           set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
           EOF
 
+      - name: check urlmon
+        run: ls /usr/x86_64-w64-mingw32/lib/ | grep -i url
+
       - name: build
         run: |
           mkdir build-windows && cd build-windows
