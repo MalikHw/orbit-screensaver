@@ -254,26 +254,50 @@ static void drawCircleFallback(float cx,float cy,float r){
 
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
+struct MesaDownloadState {
+    volatile float progress;
+    volatile int   done; // 0=running, 1=ok, -1=fail
+    std::string    url;
+    std::string    destPath;
+};
+struct MesaCallback : public IBindStatusCallback {
+    MesaDownloadState* s;
+    MesaCallback(MesaDownloadState* s):s(s){}
+    HRESULT STDMETHODCALLTYPE OnProgress(ULONG prog,ULONG progMax,ULONG,LPCWSTR) override {
+        if(progMax>0) s->progress=(float)prog/(float)progMax; return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE OnStartBinding(DWORD,IBinding*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE GetPriority(LONG*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnLowResource(DWORD) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnStopBinding(HRESULT,LPCWSTR) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE GetBindInfo(DWORD*,BINDINFO*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnDataAvailable(DWORD,DWORD,FORMATETC*,STGMEDIUM*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnObjectAvailable(REFIID,IUnknown*) override{return E_NOTIMPL;}
+    ULONG STDMETHODCALLTYPE AddRef() override{return 1;}
+    ULONG STDMETHODCALLTYPE Release() override{return 1;}
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID,void**) override{return E_NOINTERFACE;}
+};
+static DWORD WINAPI mesaThread(void* param){
+    MesaDownloadState* s=(MesaDownloadState*)param;
+    MesaCallback cb(s);
+    HRESULT hr=URLDownloadToFileA(NULL,s->url.c_str(),s->destPath.c_str(),0,&cb);
+    s->done=(hr==S_OK)?1:-1;
+    return 0;
+}
+static MesaDownloadState* g_mesaDL=nullptr;
+
 static void downloadMesa3D() {
     const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
-    std::string destPath = getExeDir() + "\\opengl32.dll";
-
     int res = MessageBoxA(NULL,
         "Please Only Use when showing white square instead,\nand/or you don't want GPU usage.\n\nDownload Mesa3D software OpenGL renderer?",
         "Install Mesa3D", MB_OKCANCEL | MB_ICONINFORMATION);
     if(res != IDOK) return;
-
-    retry:
-    bool ok=(URLDownloadToFileA(NULL,url,destPath.c_str(),0,NULL)==S_OK);
-
-    if(!ok){
-        int retry=MessageBoxA(NULL,
-            "Failed to download Mesa3D.\nCheck your internet connection.",
-            "Download Error", MB_RETRYCANCEL | MB_ICONERROR);
-        if(retry==IDRETRY) goto retry;
-        return;
-    }
-    MessageBoxA(NULL,"Mesa3D installed successfully!\nopengl32.dll is now in your orbit folder.","Mesa3D",MB_OK|MB_ICONINFORMATION);
+    g_mesaDL=new MesaDownloadState();
+    g_mesaDL->progress=0.0f;
+    g_mesaDL->done=0;
+    g_mesaDL->url=url;
+    g_mesaDL->destPath=getExeDir()+"\\opengl32.dll";
+    CreateThread(NULL,0,mesaThread,g_mesaDL,0,NULL);
 }
 
 static bool g_preview_clicked = false;
@@ -463,8 +487,20 @@ static bool runImGuiSettings() {
         }
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-        if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
-        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
+        if(g_mesaDL && g_mesaDL->done==0){
+            char lbl[16]; snprintf(lbl,sizeof(lbl),"%.0f%%",g_mesaDL->progress*100.0f);
+            ImGui::ProgressBar(g_mesaDL->progress,ImVec2(180,20),lbl);
+            ImGui::SameLine(); ImGui::TextColored(ImVec4(1,1,0,1),"Downloading...");
+        } else if(g_mesaDL && g_mesaDL->done==1){
+            ImGui::TextColored(ImVec4(0,1,0,1),"Mesa3D installed!");
+        } else if(g_mesaDL && g_mesaDL->done==-1){
+            ImGui::TextColored(ImVec4(1,0.3f,0.3f,1),"Download failed!");
+            ImGui::SameLine();
+            if(ImGui::SmallButton("Retry")){ delete g_mesaDL; g_mesaDL=nullptr; downloadMesa3D(); }
+        } else {
+            if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
+        }
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
         ImGui::Spacing();
