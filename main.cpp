@@ -254,56 +254,26 @@ static void drawCircleFallback(float cx,float cy,float r){
 
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
-struct MesaDownloadState {
-    volatile float progress;   // 0.0-1.0
-    volatile int   done;       // 0=running, 1=success, -1=fail
-    std::string    destPath;
-    std::string    url;
-};
-
-struct MesaCallback : public IBindStatusCallback {
-    MesaDownloadState* state;
-    MesaCallback(MesaDownloadState* s):state(s){}
-    HRESULT STDMETHODCALLTYPE OnProgress(ULONG prog,ULONG progMax,ULONG,LPCWSTR) override {
-        if(progMax>0) state->progress=(float)prog/(float)progMax;
-        return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE OnStartBinding(DWORD,IBinding*) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE GetPriority(LONG*) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE OnLowResource(DWORD) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE OnStopBinding(HRESULT,LPCWSTR) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE GetBindInfo(DWORD*,BINDINFO*) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE OnDataAvailable(DWORD,DWORD,FORMATETC*,STGMEDIUM*) override{return E_NOTIMPL;}
-    HRESULT STDMETHODCALLTYPE OnObjectAvailable(REFIID,IUnknown*) override{return E_NOTIMPL;}
-    ULONG STDMETHODCALLTYPE AddRef() override{return 1;}
-    ULONG STDMETHODCALLTYPE Release() override{return 1;}
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID,void**) override{return E_NOINTERFACE;}
-};
-
-static DWORD WINAPI mesaDownloadThread(void* param) {
-    MesaDownloadState* s=(MesaDownloadState*)param;
-    MesaCallback cb(s);
-    HRESULT hr=URLDownloadToFileA(NULL,s->url.c_str(),s->destPath.c_str(),0,&cb);
-    s->done=(hr==S_OK)?1:-1;
-    return 0;
-}
-
-static MesaDownloadState* g_mesaDL=nullptr;
-
 static void downloadMesa3D() {
     const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
+    std::string destPath = getExeDir() + "\\opengl32.dll";
 
     int res = MessageBoxA(NULL,
         "Please Only Use when showing white square instead,\nand/or you don't want GPU usage.\n\nDownload Mesa3D software OpenGL renderer?",
         "Install Mesa3D", MB_OKCANCEL | MB_ICONINFORMATION);
     if(res != IDOK) return;
 
-    g_mesaDL = new MesaDownloadState();
-    g_mesaDL->progress = 0.0f;
-    g_mesaDL->done     = 0;
-    g_mesaDL->destPath = getExeDir() + "\\opengl32.dll";
-    g_mesaDL->url      = url;
-    CreateThread(NULL,0,mesaDownloadThread,g_mesaDL,0,NULL);
+    retry:
+    bool ok=(URLDownloadToFileA(NULL,url,destPath.c_str(),0,NULL)==S_OK);
+
+    if(!ok){
+        int retry=MessageBoxA(NULL,
+            "Failed to download Mesa3D.\nCheck your internet connection.",
+            "Download Error", MB_RETRYCANCEL | MB_ICONERROR);
+        if(retry==IDRETRY) goto retry;
+        return;
+    }
+    MessageBoxA(NULL,"Mesa3D installed successfully!\nopengl32.dll is now in your orbit folder.","Mesa3D",MB_OK|MB_ICONINFORMATION);
 }
 
 static bool g_preview_clicked = false;
@@ -493,23 +463,8 @@ static bool runImGuiSettings() {
         }
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-        if(g_mesaDL && g_mesaDL->done==0){
-            char pctLabel[32]; snprintf(pctLabel,sizeof(pctLabel),"%.0f%%",g_mesaDL->progress*100.0f);
-            ImGui::SetNextItemWidth(180);
-            ImGui::ProgressBar(g_mesaDL->progress,ImVec2(180,20),pctLabel);
-            ImGui::SameLine(); ImGui::TextColored(ImVec4(1,1,0,1),"Downloading Mesa3D...");
-        } else {
-            if(g_mesaDL && g_mesaDL->done==1){
-                ImGui::TextColored(ImVec4(0,1,0,1),"Mesa3D installed!");
-            } else if(g_mesaDL && g_mesaDL->done==-1){
-                ImGui::TextColored(ImVec4(1,0.3f,0.3f,1),"Download failed!");
-                ImGui::SameLine();
-                if(ImGui::SmallButton("Retry")){ delete g_mesaDL; g_mesaDL=nullptr; downloadMesa3D(); }
-            } else {
-                if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
-                if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
-            }
-        }
+        if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
         ImGui::Spacing();
@@ -747,7 +702,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 }
 
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
-    MessageBoxA(NULL, GetCommandLineA(), "args", MB_OK); // temp debug
     timeBeginPeriod(1);
     loadCfg();
 
@@ -763,30 +717,26 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     }
 
     int argc;LPWSTR* wargv=CommandLineToArgvW(GetCommandLineW(),&argc);
-    bool doConfig=false,doPreview=false;
+    bool doConfig=false,doPreview=false,doRun=false;
     HWND previewHwnd=nullptr;
     for(int i=1;i<argc;i++){
         char a[64];WideCharToMultiByte(CP_ACP,0,wargv[i],-1,a,sizeof(a),0,0);
         for(char* p=a;*p;p++) *p=tolower(*p);
-        if(!strncmp(a,"/c",2)||!strncmp(a,"-c",2)){
-            doConfig=true;
-            // /c:HWND format — parent hwnd after colon (i don't need it but must not misparse)
-        } else if(!strncmp(a,"/p",2)||!strncmp(a,"-p",2)){
+        if(!strncmp(a,"/c",2)||!strncmp(a,"-c",2)) doConfig=true;
+        else if(!strncmp(a,"/p",2)||!strncmp(a,"-p",2)){
             doPreview=true;
-            // hwnd can be same arg after colon: /p:12345, or next arg: /p 12345
             const char* colon=strchr(a,':');
-            if(colon && *(colon+1)){
-                previewHwnd=(HWND)(uintptr_t)atoll(colon+1);
-            } else if(i+1<argc){
-                char b[32];WideCharToMultiByte(CP_ACP,0,wargv[i+1],-1,b,sizeof(b),0,0);
-                previewHwnd=(HWND)(uintptr_t)atoll(b);
-                i++;
-            }
+            if(colon&&*(colon+1)) previewHwnd=(HWND)(uintptr_t)atoll(colon+1);
+            else if(i+1<argc){char b[32];WideCharToMultiByte(CP_ACP,0,wargv[i+1],-1,b,sizeof(b),0,0);previewHwnd=(HWND)(uintptr_t)atoll(b);i++;}
         }
+        else if(!strncmp(a,"/s",2)||!strncmp(a,"-s",2)) doRun=true;
     }
     LocalFree(wargv);
 
-    if(doConfig){bool prev=runImGuiSettings();if(prev)runScreensaver(false,nullptr);}
+    // no args at all = right-click Configure
+    if(!doConfig&&!doPreview&&!doRun) doConfig=true;
+
+    if(doConfig) runImGuiSettings();
     else if(doPreview) runScreensaver(true,(void*)previewHwnd);
     else runScreensaver(false,nullptr);
 
