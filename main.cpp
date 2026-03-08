@@ -428,7 +428,7 @@ static bool runImGuiSettings() {
         if(broPopupPending){ ImGui::OpenPopup("bro"); broPopupPending=false; }
 
         if(ImGui::BeginPopupModal("bro",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
-            ImGui::Text("bro what the fuck? :sob:, how is even THAT!?");
+            ImGui::Text("bro what the fuck? :sob:, why is even THAT!?");
             if(ImGui::Button("yes")) ImGui::CloseCurrentPopup();
             ImGui::EndPopup();
         }
