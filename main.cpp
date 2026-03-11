@@ -701,6 +701,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 int chosenOrb = rand()%NUM_ORBS; 
 
                 b2BodyDef bd;bd.type=b2_dynamicBody;
+                bd.bullet = true;
                 bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
 
                 bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f); 
@@ -743,6 +744,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     }
 
                     b2BodyDef bd;bd.type=b2_dynamicBody;
+                    bd.bullet = true;
                     bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
 
                     bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
@@ -782,7 +784,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
             Uint32 now=SDL_GetTicks();
             physAccum+=(now-lastTick)/1000.0f;lastTick=now;
-            while(physAccum>=physStep){world.Step(physStep,8,3);physAccum-=physStep;}
+            while(physAccum>=physStep){world.Step(physStep, 16, 12);physAccum-=physStep;}
 
             int bm=g_settings.bg_mode;
             if((bm==BG_SNAPSHOT||bm==BG_BLUR_SNAP)&&snapTex.ok){
