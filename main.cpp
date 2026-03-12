@@ -712,11 +712,23 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
                 b2CircleShape cs;
                 b2PolygonShape ps;
-
+                int GREEN_ARROW = 0; 
+                int PINK_ARROW = 1;
                 if (chosenOrb == 10) {
                     ps.SetAsBox(radius/PPM, radius/PPM);
                     fd.shape=&ps;
-                } else {
+                } 
+                else if (chosenOrb == GREEN_ARROW || chosenOrb == PINK_ARROW) {
+                    b2Vec2 vertices[3];
+                    float h_scale = 138.0f / 155.0f;
+                    vertices[0].Set(radius/PPM, 0.0f); 
+                    vertices[1].Set(-radius/PPM, (radius * h_scale)/PPM); 
+                    vvertices[2].Set(-radius/PPM, -(radius * h_scale)/PPM); 
+                    
+                    ps.Set(vertices, 3);
+                    fd.shape=&ps;
+                }
+                else {
                     cs.m_radius=radius/PPM;
                     fd.shape=&cs;
                 }
