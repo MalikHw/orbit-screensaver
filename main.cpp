@@ -44,7 +44,7 @@
 #define FIT_ZOOM    1
 #define FIT_TILE    2
 
-#define NUM_ORBS    11
+#define NUM_ORBS    10
 #define PPM         40.0f
 #define PLAYER_SIZE 80
 
@@ -698,67 +698,24 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
-                int chosenOrb = rand()%NUM_ORBS; 
-
                 b2BodyDef bd;bd.type=b2_dynamicBody;
                 bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
-
-                bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f); 
-                
                 b2Body* body=world.CreateBody(&bd);
-                
-                b2FixtureDef fd;
-                fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
-
-                b2CircleShape cs;
-                b2PolygonShape ps;
-
-                if (chosenOrb == 10) {
-                    ps.SetAsBox(radius/PPM, radius/PPM);
-                    fd.shape=&ps;
-                } else {
-                    cs.m_radius=radius/PPM;
-                    fd.shape=&cs;
-                }
-
+                b2CircleShape cs;cs.m_radius=radius/PPM;
+                b2FixtureDef fd;fd.shape=&cs;fd.density=1.0f;fd.restitution=0.5f;fd.friction=1.0f;
                 body->CreateFixture(&fd);
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                
-                Ball ball; ball.body=body; ball.radius=radius; ball.orbIdx=chosenOrb; ball.isPlayer=false;
+                Ball ball;ball.body=body;ball.radius=radius;ball.orbIdx=rand()%NUM_ORBS;ball.isPlayer=false;
                 balls.push_back(ball);
                 nextSpawn++;
             }
             if(!playerSpawned && nextSpawn >= numBalls/2){
                 playerSpawned=true;
                 if((rand()%100) < g_settings.cube_chance){
-                    float cubeW = PLAYER_SIZE * g_settings.orb_scale;
-                    float cubeH = PLAYER_SIZE * g_settings.orb_scale;
-                    
-                    if (cubeTex.ok) {
-                        float tw = (float)cubeTex.w;
-                        float th = (float)cubeTex.h;
-                        float max_dim = fmaxf(tw, th);
-                        cubeW *= (tw / max_dim);
-                        cubeH *= (th / max_dim);
-                    }
-
-                    b2BodyDef bd;bd.type=b2_dynamicBody;
-                    float randomX = (float)(rand() % W);
-                    float randomY = - (float)(200 + rand() % 800);
-                    bd.position.Set(randomX / PPM, randomY / PPM);
-
-                    bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
-                    
+                    b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
                     b2Body* body=world.CreateBody(&bd);
-                    b2PolygonShape ps;
-                    ps.SetAsBox((cubeW * 0.5f)/PPM, (cubeH * 0.5f)/PPM);
-                    
-                    b2FixtureDef fd;
-                    fd.shape=&ps;
-                    fd.density=1.0f;       
-                    fd.restitution=0.5f;   
-                    fd.friction=0.7f;      
-                    
+                    b2PolygonShape ps;ps.SetAsBox(PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM,PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM);
+                    b2FixtureDef fd;fd.shape=&ps;fd.density=1.0f;fd.restitution=0.5f;fd.friction=0.7f;
                     body->CreateFixture(&fd);
                     Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f*g_settings.orb_scale;ball.orbIdx=0;ball.isPlayer=true;
                     balls.push_back(ball);
@@ -805,28 +762,11 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 float ang=b.body->GetAngle()*180.0f/(float)M_PI;
                 if(b.isPlayer){
                     float s=PLAYER_SIZE*g_settings.orb_scale;
-                    if(cubeTex.ok) {
-                        float tw = (float)cubeTex.w;
-                        float th = (float)cubeTex.h;
-                        float max_dim = fmaxf(tw, th);
-                        float draw_w = s * (tw / max_dim);
-                        float draw_h = s * (th / max_dim);
-                        drawTexturedQuad(cubeTex.id, px, py, draw_w, draw_h, ang);
-                    }
-                    else{
-                        glColor3f(0.78f,0.39f,0.39f);glPushMatrix();glTranslatef(px,py,0);glRotatef(-ang,0,0,1);float h2=s/2;glBegin(GL_QUADS);glVertex2f(-h2,-h2);glVertex2f(h2,-h2);glVertex2f(h2,h2);glVertex2f(-h2,h2);glEnd();glPopMatrix();glColor3f(1,1,1);
-                    }
+                    if(cubeTex.ok) drawTexturedQuad(cubeTex.id,px,py,s,s,ang);
+                    else{glColor3f(0.78f,0.39f,0.39f);glPushMatrix();glTranslatef(px,py,0);glRotatef(-ang,0,0,1);float h2=s/2;glBegin(GL_QUADS);glVertex2f(-h2,-h2);glVertex2f(h2,-h2);glVertex2f(h2,h2);glVertex2f(-h2,h2);glEnd();glPopMatrix();glColor3f(1,1,1);}
                 } else {
                     float d=b.radius*2;
-                    if(orbTex[b.orbIdx].ok) {
-                        float tw = (float)orbTex[b.orbIdx].w;
-                        float th = (float)orbTex[b.orbIdx].h;
-                        float max_dim = fmaxf(tw, th);
-                        float draw_w = d * (tw / max_dim);
-                        float draw_h = d * (th / max_dim);
-                        
-                        drawTexturedQuad(orbTex[b.orbIdx].id, px, py, draw_w, draw_h, ang);
-                    }
+                    if(orbTex[b.orbIdx].ok) drawTexturedQuad(orbTex[b.orbIdx].id,px,py,d,d,ang);
                     else drawCircleFallback(px,py,b.radius);
                 }
             }
