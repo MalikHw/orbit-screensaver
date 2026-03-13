@@ -352,6 +352,13 @@ static bool runImGuiSettings() {
     ImGui_ImplSDL2_InitForOpenGL(win,ctx);
     ImGui_ImplOpenGL2_Init();
 
+    {
+        ImGui_ImplOpenGL2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+        ImGui::EndFrame();
+    }
+
     GLuint logoTex=0;
     {
         SDL_RWops* rw=SDL_RWFromConstMem(logo_png,logo_png_len);
