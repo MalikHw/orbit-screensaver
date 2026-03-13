@@ -378,7 +378,7 @@ static bool runImGuiSettings() {
         }
     }
 
-    const char* bgNames[]={"Black","Custom Color","Image","Transparent (snapshot)","Blur (snapshot)"};
+    const char* bgNames[]={"Black","Custom Color","Image"};
     const char* fitNames[]={"Stretch","Zoom","Tile"};
 
     static std::string latestTag="";
@@ -466,7 +466,7 @@ static bool runImGuiSettings() {
 
         ImGui::Text("Background");
         ImGui::SetNextItemWidth(200);
-        ImGui::Combo("##bg",&g_settings.bg_mode,bgNames,5);
+        ImGui::Combo("##bg",&g_settings.bg_mode,bgNames,3);
         if(g_settings.bg_mode==BG_COLOR)
             ImGui::ColorEdit3("Color",&g_settings.bg_color[0]);
         if(g_settings.bg_mode==BG_IMAGE){
