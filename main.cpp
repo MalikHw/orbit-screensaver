@@ -254,7 +254,7 @@ static Texture loadTextureFromPixels(unsigned char* pixels, int w, int h) {
 static void drawTexturedQuad(GLuint texId,float cx,float cy,float w,float h,float angleDeg){
     glEnable(GL_TEXTURE_2D);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glBindTexture(GL_TEXTURE_2D,texId);
-    glPushMatrix();glTranslatef(cx,cy,0);glRotatef(-angleDeg,0,0,1);
+    glPushMatrix();glTranslatef(cx,cy,0);glRotatef(angleDeg,0,0,1);
     float hw=w/2,hh=h/2;
     glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(-hw,-hh);glTexCoord2f(1,0);glVertex2f(hw,-hh);glTexCoord2f(1,1);glVertex2f(hw,hh);glTexCoord2f(0,1);glVertex2f(-hw,hh);glEnd();
     glPopMatrix();glDisable(GL_TEXTURE_2D);glDisable(GL_BLEND);
