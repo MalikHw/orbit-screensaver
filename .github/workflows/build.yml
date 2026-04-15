@@ -15,7 +15,7 @@ jobs:
           submodules: recursive
 
       - name: deps
-        run: sudo apt-get update -qq && sudo apt-get install -y mingw-w64 cmake build-essential wget unzip
+        run: sudo apt-get update -qq && sudo apt-get install -y mingw-w64 cmake build-essential wget unzip python3
 
       - name: set version
         id: version
@@ -87,21 +87,29 @@ jobs:
       - name: collect and zip
         run: |
           mkdir -p dist
-          # handle mingw ignoring SUFFIX .scr
+
+          # screensaver binary (mingw may ignore .scr suffix)
           if [ -f build-windows/orbit_screensaver.scr ]; then
             cp build-windows/orbit_screensaver.scr dist/orbit_screensaver.scr
           else
             cp build-windows/orbit_screensaver.exe dist/orbit_screensaver.scr
           fi
-          cp build-windows/updater.exe             dist/
+
+          # updater
+          cp build-windows/updater.exe dist/
+
+          # runtime DLLs
           cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist/
           cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist/
           find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll"  -exec cp {} dist/ \; 2>/dev/null || true
           find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"     -exec cp {} dist/ \; 2>/dev/null || true
           find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist/ \; 2>/dev/null || true
-          cp orb*.png cube.png dist/
+
+          # README — no PNGs needed, they're baked in
           cp README.txt dist/
-          # both zips same contents - orbit-screensaver for new users, orbit-update for auto updater
+
+          # orbit-screensaver.zip  →  for new users
+          # orbit-update.zip       →  same contents, for the auto-updater
           cd dist && zip -r ../orbit-screensaver.zip . && cd ..
           cp orbit-screensaver.zip orbit-update.zip
 
