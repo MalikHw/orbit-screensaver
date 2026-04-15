@@ -10,7 +10,7 @@
 #include <time.h>
 #include <vector>
 #include <string>
-// epstein
+
 #include <windows.h>
 #include <shlobj.h>
 #include <shellapi.h>
@@ -28,7 +28,19 @@
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl2.h"
+
 #include "logo_data.h"
+#include "orb1_data.h"
+#include "orb2_data.h"
+#include "orb3_data.h"
+#include "orb4_data.h"
+#include "orb5_data.h"
+#include "orb6_data.h"
+#include "orb7_data.h"
+#include "orb8_data.h"
+#include "orb9_data.h"
+#include "orb10_data.h"
+#include "cube_data.h"
 
 #ifndef APP_VERSION
 #define APP_VERSION "dev"
@@ -55,7 +67,8 @@ struct Settings {
     float bg_color[3];
     char  bg_image[512];
     int   bg_fit;
-    char  cube_path[512];
+    char  cube_path[512];   
+
     bool  no_ground;
     float orb_scale;
     int   orb_count;
@@ -152,7 +165,8 @@ static void launchUpdater() {
 
 struct UpdateDownloadState {
     volatile float progress;
-    volatile int   done; // 0=running, 1=ok, -1=fail
+    volatile int   done; 
+
     std::string    url;
     std::string    destPath;
 };
@@ -214,7 +228,7 @@ static unsigned char* captureDesktop(int* outW, int* outH) {
     if(hDesk) CloseDesktop(hDesk);
     return pixels;
 }
-// this blur runs on the CPU like an idiot, don't touch it
+
 static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
     unsigned char* tmp=(unsigned char*)malloc(W*H*4);
     for(int y=0;y<H;y++) for(int x=0;x<W;x++){
@@ -231,9 +245,24 @@ static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
 }
 
 struct Texture { GLuint id; int w,h; bool ok; };
+
 static Texture loadTexture(const char* path) {
     Texture t={0,0,0,false};
     SDL_Surface* surf=IMG_Load(path); if(!surf)return t;
+    SDL_Surface* conv=SDL_ConvertSurfaceFormat(surf,SDL_PIXELFORMAT_RGBA32,0);
+    SDL_FreeSurface(surf); if(!conv)return t;
+    glGenTextures(1,&t.id);
+    glBindTexture(GL_TEXTURE_2D,t.id);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,conv->w,conv->h,0,GL_RGBA,GL_UNSIGNED_BYTE,conv->pixels);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    t.w=conv->w;t.h=conv->h;t.ok=true;SDL_FreeSurface(conv);return t;
+}
+
+static Texture loadTextureFromMem(const unsigned char* data, unsigned int len) {
+    Texture t={0,0,0,false};
+    SDL_RWops* rw=SDL_RWFromConstMem(data,len); if(!rw)return t;
+    SDL_Surface* surf=IMG_LoadPNG_RW(rw); SDL_RWclose(rw); if(!surf)return t;
     SDL_Surface* conv=SDL_ConvertSurfaceFormat(surf,SDL_PIXELFORMAT_RGBA32,0);
     SDL_FreeSurface(surf); if(!conv)return t;
     glGenTextures(1,&t.id);
@@ -286,7 +315,8 @@ struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
 struct MesaDownloadState {
     volatile float progress;
-    volatile int   done; // 0=running, 1=ok, -1=fail
+    volatile int   done; 
+
     std::string    url;
     std::string    destPath;
 };
@@ -330,6 +360,7 @@ static bool g_preview_clicked = false;
 
 static bool runImGuiSettings() {
     if(SDL_Init(SDL_INIT_VIDEO)<0) return false;
+    IMG_Init(IMG_INIT_PNG);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
     SDL_Window* win=SDL_CreateWindow("Orbit Screensaver - Settings",
         SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,460,560,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
@@ -361,7 +392,7 @@ static bool runImGuiSettings() {
 
     GLuint logoTex=0;
     {
-        SDL_RWops* rw=SDL_RWFromConstMem(logo_png,logo_png_len);
+        SDL_RWops* rw=SDL_RWFromConstMem(logo_data,logo_data_len);
         SDL_Surface* surf=IMG_LoadPNG_RW(rw);
         SDL_RWclose(rw);
         if(surf){
@@ -452,7 +483,7 @@ static bool runImGuiSettings() {
         ImGui::SameLine(); ImGui::TextDisabled("%%");
         ImGui::Spacing();
 
-        ImGui::Text("Cube PNG");
+        ImGui::Text("Cube PNG (optional override)");
         ImGui::SetNextItemWidth(280);
         ImGui::InputText("##cube",g_settings.cube_path,sizeof(g_settings.cube_path));
         ImGui::SameLine();
@@ -462,6 +493,7 @@ static bool runImGuiSettings() {
             ofn.lpstrFile=buf;ofn.nMaxFile=sizeof(buf);ofn.Flags=OFN_FILEMUSTEXIST;
             if(GetOpenFileNameA(&ofn)) strncpy(g_settings.cube_path,buf,511);
         }
+        ImGui::TextDisabled("Leave empty to use built-in cube");
         ImGui::Spacing();
 
         ImGui::Text("Background");
@@ -604,9 +636,22 @@ static bool runImGuiSettings() {
     if(logoTex) glDeleteTextures(1,&logoTex);
     SDL_GL_DeleteContext(ctx);
     SDL_DestroyWindow(win);
+    IMG_Quit();
     SDL_Quit();
     return g_preview_clicked;
 }
+
+static const unsigned char* s_orbData[NUM_ORBS] = {
+    orb1_data, orb2_data, orb3_data, orb4_data, orb5_data,
+    orb6_data, orb7_data, orb8_data, orb9_data, orb10_data,
+    nullptr 
+
+};
+static const unsigned int s_orbDataLen[NUM_ORBS] = {
+    orb1_data_len, orb2_data_len, orb3_data_len, orb4_data_len, orb5_data_len,
+    orb6_data_len, orb7_data_len, orb8_data_len, orb9_data_len, orb10_data_len,
+    0
+};
 
 static void runScreensaver(bool isPreview, void* previewHandle) {
     HWND parentHwnd=(HWND)previewHandle;
@@ -648,13 +693,20 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     Texture snapTex={0,0,0,false};
     if(needSnap&&snapPixels){snapTex=loadTextureFromPixels(snapPixels,snapW,snapH);free(snapPixels);snapPixels=nullptr;}
 
-    std::string assetDir=getExeDir();
     Texture orbTex[NUM_ORBS];
-    for(int i=0;i<NUM_ORBS;i++){char p[600];snprintf(p,sizeof(p),"%s/orb%d.png",assetDir.c_str(),i+1);orbTex[i]=loadTexture(p);}
+    for(int i=0;i<NUM_ORBS-1;i++){
+        orbTex[i]=loadTextureFromMem(s_orbData[i],s_orbDataLen[i]);
+    }
+    orbTex[NUM_ORBS-1]={0,0,0,false}; 
+
     Texture cubeTex={0,0,0,false};
-    {const char* cs=g_settings.cube_path[0]?g_settings.cube_path:nullptr;
-     if(!cs){char p[600];snprintf(p,sizeof(p),"%s/cube.png",assetDir.c_str());cubeTex=loadTexture(p);}
-     else cubeTex=loadTexture(cs);}
+    if(g_settings.cube_path[0]){
+        cubeTex=loadTexture(g_settings.cube_path);
+    }
+    if(!cubeTex.ok){
+        cubeTex=loadTextureFromMem(cube_data,cube_data_len);
+    }
+
     Texture bgTex={0,0,0,false};
     if(g_settings.bg_mode==BG_IMAGE&&g_settings.bg_image[0]) bgTex=loadTexture(g_settings.bg_image);
 
@@ -705,15 +757,14 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
-                int chosenOrb = rand()%NUM_ORBS; 
+                int chosenOrb = rand()%NUM_ORBS;
 
                 b2BodyDef bd;bd.type=b2_dynamicBody;
                 bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
+                bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
 
-                bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f); 
-                
                 b2Body* body=world.CreateBody(&bd);
-                
+
                 b2FixtureDef fd;
                 fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
 
@@ -730,7 +781,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
                 body->CreateFixture(&fd);
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                
+
                 Ball ball; ball.body=body; ball.radius=radius; ball.orbIdx=chosenOrb; ball.isPlayer=false;
                 balls.push_back(ball);
                 nextSpawn++;
@@ -740,7 +791,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 if((rand()%100) < g_settings.cube_chance){
                     float cubeW = PLAYER_SIZE * g_settings.orb_scale;
                     float cubeH = PLAYER_SIZE * g_settings.orb_scale;
-                    
+
                     if (cubeTex.ok) {
                         float tw = (float)cubeTex.w;
                         float th = (float)cubeTex.h;
@@ -753,19 +804,18 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     float randomX = (float)(rand() % W);
                     float randomY = - (float)(200 + rand() % 800);
                     bd.position.Set(randomX / PPM, randomY / PPM);
-
                     bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
-                    
+
                     b2Body* body=world.CreateBody(&bd);
                     b2PolygonShape ps;
                     ps.SetAsBox((cubeW * 0.5f)/PPM, (cubeH * 0.5f)/PPM);
-                    
+
                     b2FixtureDef fd;
                     fd.shape=&ps;
-                    fd.density=1.0f;       
-                    fd.restitution=0.5f;   
-                    fd.friction=0.7f;      
-                    
+                    fd.density=1.0f;
+                    fd.restitution=0.5f;
+                    fd.friction=0.7f;
+
                     body->CreateFixture(&fd);
                     Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f*g_settings.orb_scale;ball.orbIdx=0;ball.isPlayer=true;
                     balls.push_back(ball);
@@ -778,7 +828,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 if(SDL_GetTicks()-allSpawnedAt >= delay){
                     fillingDone=true;
                     draining=true;
-                    if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; } // bye bitch
+                    if(wallBottom){ world.DestroyBody(wallBottom); wallBottom=nullptr; } 
+
                 }
             }
             if(!g_settings.no_ground&&draining){
@@ -831,7 +882,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                         float max_dim = fmaxf(tw, th);
                         float draw_w = d * (tw / max_dim);
                         float draw_h = d * (th / max_dim);
-                        
                         drawTexturedQuad(orbTex[b.orbIdx].id, px, py, draw_w, draw_h, ang);
                     }
                     else drawCircleFallback(px,py,b.radius);
@@ -858,7 +908,6 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     timeBeginPeriod(1);
     loadCfg();
 
-    // swap pending updater if exists (installed by previous update)
     {
         std::string exeDir=getExeDir();
         std::string pending=exeDir+"\\updater.exe.pending";
@@ -886,7 +935,6 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     }
     LocalFree(wargv);
 
-    // no args at all = right-click Configure
     if(!doConfig&&!doPreview&&!doRun) doConfig=true;
 
     if(doConfig) runImGuiSettings();
