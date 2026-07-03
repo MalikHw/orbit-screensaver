@@ -29,6 +29,18 @@
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl2.h"
 #include "logo_data.h"
+#include "orb1_data.h"
+#include "orb2_data.h"
+#include "orb3_data.h"
+#include "orb4_data.h"
+#include "orb5_data.h"
+#include "orb6_data.h"
+#include "orb7_data.h"
+#include "orb8_data.h"
+#include "orb9_data.h"
+#include "orb10_data.h"
+#include "orb11_data.h"
+#include "cube_data.h"
 
 #ifndef APP_VERSION
 #define APP_VERSION "dev"
@@ -243,6 +255,24 @@ static Texture loadTexture(const char* path) {
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     t.w=conv->w;t.h=conv->h;t.ok=true;SDL_FreeSurface(conv);return t;
 }
+static Texture loadTextureFromMemory(const unsigned char* data, size_t len) {
+    Texture t={0,0,0,false};
+    SDL_RWops* rw = SDL_RWFromConstMem(data, (int)len);
+    if (!rw) return t;
+    SDL_Surface* surf = IMG_LoadPNG_RW(rw);
+    SDL_RWclose(rw);
+    if (!surf) return t;
+    SDL_Surface* conv = SDL_ConvertSurfaceFormat(surf, SDL_PIXELFORMAT_RGBA32, 0);
+    SDL_FreeSurface(surf);
+    if (!conv) return t;
+    glGenTextures(1,&t.id);
+    glBindTexture(GL_TEXTURE_2D,t.id);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,conv->w,conv->h,0,GL_RGBA,GL_UNSIGNED_BYTE,conv->pixels);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    t.w=conv->w;t.h=conv->h;t.ok=true;SDL_FreeSurface(conv);return t;
+}
+
 static Texture loadTextureFromPixels(unsigned char* pixels, int w, int h) {
     Texture t={0,0,0,false};
     glGenTextures(1,&t.id);glBindTexture(GL_TEXTURE_2D,t.id);
@@ -648,12 +678,21 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     Texture snapTex={0,0,0,false};
     if(needSnap&&snapPixels){snapTex=loadTextureFromPixels(snapPixels,snapW,snapH);free(snapPixels);snapPixels=nullptr;}
 
-    std::string assetDir=getExeDir();
     Texture orbTex[NUM_ORBS];
-    for(int i=0;i<NUM_ORBS;i++){char p[600];snprintf(p,sizeof(p),"%s/orb%d.png",assetDir.c_str(),i+1);orbTex[i]=loadTexture(p);}
+    orbTex[0] = loadTextureFromMemory(orb1_png, orb1_png_len);
+    orbTex[1] = loadTextureFromMemory(orb2_png, orb2_png_len);
+    orbTex[2] = loadTextureFromMemory(orb3_png, orb3_png_len);
+    orbTex[3] = loadTextureFromMemory(orb4_png, orb4_png_len);
+    orbTex[4] = loadTextureFromMemory(orb5_png, orb5_png_len);
+    orbTex[5] = loadTextureFromMemory(orb6_png, orb6_png_len);
+    orbTex[6] = loadTextureFromMemory(orb7_png, orb7_png_len);
+    orbTex[7] = loadTextureFromMemory(orb8_png, orb8_png_len);
+    orbTex[8] = loadTextureFromMemory(orb9_png, orb9_png_len);
+    orbTex[9] = loadTextureFromMemory(orb10_png, orb10_png_len);
+    orbTex[10] = loadTextureFromMemory(orb11_png, orb11_png_len);
     Texture cubeTex={0,0,0,false};
     {const char* cs=g_settings.cube_path[0]?g_settings.cube_path:nullptr;
-     if(!cs){char p[600];snprintf(p,sizeof(p),"%s/cube.png",assetDir.c_str());cubeTex=loadTexture(p);}
+     if(!cs){cubeTex=loadTextureFromMemory(cube_png, cube_png_len);}
      else cubeTex=loadTexture(cs);}
     Texture bgTex={0,0,0,false};
     if(g_settings.bg_mode==BG_IMAGE&&g_settings.bg_image[0]) bgTex=loadTexture(g_settings.bg_image);

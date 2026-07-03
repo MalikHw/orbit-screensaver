@@ -45,11 +45,22 @@ endif()
 target_link_libraries(updater PRIVATE shell32 winhttp advapi32 ole32 oleaut32 urlmon)
 set_target_properties(updater PROPERTIES OUTPUT_NAME "updater")
 
-# copy assets
-foreach(ASSET orb1.png orb2.png orb3.png orb4.png orb5.png orb6.png orb7.png orb8.png orb9.png orb10.png cube.png)
-    if(EXISTS "${CMAKE_SOURCE_DIR}/${ASSET}")
-        add_custom_command(TARGET orbit_screensaver POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_SOURCE_DIR}/${ASSET}" "$<TARGET_FILE_DIR:orbit_screensaver>/${ASSET}")
-    endif()
-endforeach()
+# Generated header files with embedded PNG data
+set(EMBEDDED_HEADERS
+    logo_data.h
+    orb1_data.h
+    orb2_data.h
+    orb3_data.h
+    orb4_data.h
+    orb5_data.h
+    orb6_data.h
+    orb7_data.h
+    orb8_data.h
+    orb9_data.h
+    orb10_data.h
+    orb11_data.h
+    cube_data.h
+)
+
+# Add header files to the executable so they show up in IDEs
+target_sources(orbit_screensaver PRIVATE ${EMBEDDED_HEADERS})
