@@ -10,7 +10,7 @@
 #include <time.h>
 #include <vector>
 #include <string>
-// epstein
+// jeffrey epstein
 #include <windows.h>
 #include <shlobj.h>
 #include <shellapi.h>
