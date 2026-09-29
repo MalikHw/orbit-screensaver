@@ -1,0 +1,2721 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ORBIT Ball Pit (Wallpaper Engine)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+#c{position:fixed;left:0;top:0;width:100vw;height:100vh}
+
+/* UI layer */
+#ui{position:fixed;inset:0;z-index:2147483647;pointer-events:none}
+#ui *{pointer-events:auto}
+
+/* Debug/status */
+#status{
+  position:fixed;right:10px;top:10px;z-index:1000;
+  color:#fff;font-size:13px;line-height:1.25;
+  background:rgba(0,0,0,.62);padding:8px 10px;border-radius:10px;
+  white-space:pre; max-width:720px; overflow:hidden;
+  display:none;
+}
+
+/* Menu */
+#menu{
+  position:fixed;left:18px;top:18px;z-index:999;
+  width:640px; max-width:calc(100vw - 36px);
+  max-height:calc(100vh - 36px);
+  overflow:auto;
+  background:rgba(0,0,0,.84);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  box-shadow:0 12px 50px rgba(0,0,0,.55);
+  display:none;
+}
+#menuHeader{
+  position:sticky;top:0;z-index:5;
+  padding:10px 12px;
+  background:rgba(255,255,255,.06);
+  border-bottom:1px solid rgba(255,255,255,.10);
+  cursor:move; user-select:none;
+  display:flex; gap:10px; align-items:center; justify-content:space-between;
+}
+#menuHeader .title{font-weight:700;letter-spacing:.2px}
+#menuHeader .hint{opacity:.85;font-size:12px}
+#menuBody{padding:12px}
+#disclaimer{
+  padding:10px 12px;border-radius:12px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);
+  font-size:12px;line-height:1.25;opacity:.95;
+  margin-bottom:12px;
+}
+#tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tab{
+  padding:7px 10px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);
+  cursor:pointer; user-select:none;
+  font-size:12px;
+}
+.tab.active{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28)}
+.section{margin:12px 0 8px;font-weight:700;opacity:.95}
+.sub{margin:8px 0 6px;font-weight:650;opacity:.92;font-size:12px}
+.row{display:grid;grid-template-columns: 220px 1fr 140px;gap:10px;align-items:center;margin:7px 0}
+@media (max-width:720px){ .row{grid-template-columns: 1fr} .row label{margin-bottom:2px} }
+.row label{opacity:.95;font-size:12px}
+.row .help{
+  display:inline-grid;place-items:center;
+  width:18px;height:18px;margin-left:6px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);
+  font-size:12px;opacity:.85;cursor:help;user-select:none;
+}
+.ctrl{display:flex;gap:8px;align-items:center}
+.ctrl input[type="range"]{flex:1}
+.ctrl input[type="number"], .ctrl input[type="text"], select{
+  width:140px;background:#0f0f0f;color:#fff;
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:10px;padding:6px 8px;
+}
+select{width:180px}
+.ctrl input[type="checkbox"]{transform:scale(1.15)}
+.small{opacity:.82;font-size:11px;line-height:1.25;margin-top:6px}
+hr{border:none;border-top:1px solid rgba(255,255,255,.12);margin:12px 0}
+
+/* Hitbox editor HUD */
+#hbHUD{
+  position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+  z-index:1200;
+  display:none;
+  pointer-events:auto;
+}
+#hbPanel{
+  background:rgba(0,0,0,.78);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;
+  padding:10px 12px;
+  box-shadow:0 10px 40px rgba(0,0,0,.55);
+  color:#fff;
+  width:min(920px, calc(100vw - 24px));
+}
+#hbTop{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+#hbTop select, #hbTop input[type="number"]{width:auto}
+.pillRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.pill{
+  padding:6px 10px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  cursor:pointer;user-select:none;font-size:12px;
+}
+.pill.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.30)}
+.pill.danger{border-color:rgba(255,120,120,.35)}
+.btn{
+  padding:7px 10px;border-radius:12px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);
+  color:#fff;cursor:pointer;user-select:none;
+}
+.btn:hover{background:rgba(255,255,255,.10)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+#hbFields{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin-top:10px}
+#hbFields .field{display:flex;gap:6px;align-items:center}
+#hbFields .field label{font-size:12px;opacity:.92}
+#hbFields input[type="number"]{width:110px}
+#hbHint{margin-top:10px;text-align:center;font-size:12px;opacity:.86;line-height:1.25}
+kbd{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.12);padding:2px 6px;border-radius:8px;font-size:11px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="status">Loading...</div>
+
+  <div id="menu">
+    <div id="menuHeader">
+      <div>
+        <div class="title">ORBIT Ball Pit — Dev Panel</div>
+        <div class="hint">Toggle: <b>Ctrl + M</b> • Drag this header to move</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnHitbox" class="btn" title="Toggle Hitbox Editor">Hitbox editor</button>
+        <button id="btnClose" class="btn" title="Close menu">Close</button>
+      </div>
+    </div>
+    <div id="menuBody">
+      <div id="disclaimer">
+        <b>Developer tools.</b> If you found this menu by accident: please use Wallpaper Engine's <b>Properties</b>
+        panel instead. This dev panel is for tuning/testing and may change at any time.
+      </div>
+
+      <div id="tabs"></div>
+      <div id="controls"></div>
+
+      <hr>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="btnCopyConfig" class="btn">Copy CONFIG</button>
+        <button id="btnCopyHitboxes" class="btn">Copy HITBOXES</button>
+        <button id="btnResetLocal" class="btn" title="Clears local saved tweaks (not WE properties)">Reset local save</button>
+      </div>
+      <div class="small">
+        Note: Clipboard buttons copy text; to bake defaults into the wallpaper, paste into the file and repack.
+      </div>
+    </div>
+  </div>
+
+  <!-- Hitbox editor HUD (bottom-center) -->
+  <div id="hbHUD">
+    <div id="hbPanel">
+      <div id="hbTop">
+        <span style="font-weight:700;opacity:.95">Hitbox Editor</span>
+        <select id="hbSprite"></select>
+        <button id="hbAdd" class="btn" title="Add new hitbox part">+ Add</button>
+        <button id="hbDel" class="btn" title="Delete selected hitbox part">Delete</button>
+        <select id="hbShape" title="Shape">
+          <option value="circle">Circle</option>
+          <option value="square">Square</option>
+          <option value="triangle">Triangle</option>
+        </select>
+      </div>
+
+      <div class="pillRow" id="hbParts"></div>
+
+      <div id="hbFields">
+        <div class="field"><label>Size</label><input id="hbScale" type="number" step="0.01"></div>
+        <div class="field"><label>Offset X</label><input id="hbOffX" type="number" step="0.5"></div>
+        <div class="field"><label>Offset Y</label><input id="hbOffY" type="number" step="0.5"></div>
+        <div class="field"><label>Rotation°</label><input id="hbRot" type="number" step="1"></div>
+        <button id="hbApply" class="btn">Apply</button>
+      </div>
+
+      <div id="hbHint">
+        Drag on the canvas to move the selected hitbox. Mouse wheel = size. <kbd>Shift</kbd> + wheel = rotate.<br>
+        <kbd>←</kbd>/<kbd>→</kbd> switch sprite • Click the pills to switch hitbox part.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="matter.min.js"></script>
+<script>
+/* ============================================================
+   ORBIT Ball Pit — polished rewrite for Wallpaper Engine.
+   - Ctrl+M toggles menu, no invisible hotspot.
+   - Looping cycles: fill -> settle -> drop -> reset.
+   - Configurable physics + behavior + particles + distribution.
+   - Hitbox editor: bottom-center selector, big preview, unlimited parts.
+   - Hitbox shapes: circle/square/triangle (+ rotation per part).
+   - Cube system: at most one cube per cycle (optional), cube1..cube10.
+   - Settings saved in localStorage (and WE user properties can override).
+   ============================================================ */
+
+(function(){
+'use strict';
+
+const __statusEl = document.getElementById('status');
+function __boot(msg){
+  try{
+    if(!__statusEl) return;
+    __statusEl.style.display='block';
+    __statusEl.style.position='fixed';
+    __statusEl.style.right='12px';
+    __statusEl.style.top='12px';
+    __statusEl.style.maxWidth='60vw';
+    __statusEl.style.maxHeight='70vh';
+    __statusEl.style.overflow='auto';
+    __statusEl.style.zIndex='999999';
+    __statusEl.style.background='rgba(0,0,0,0.75)';
+    __statusEl.style.border='1px solid rgba(255,255,255,0.25)';
+    __statusEl.style.padding='10px 12px';
+    __statusEl.style.font='12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    __statusEl.style.whiteSpace='pre-wrap';
+    __statusEl.textContent = msg;
+  }catch(_){ }
+}
+__boot('Loading ORBIT Ball Pit…');
+
+try{
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// --- Resolution-independent scaling (virtual 1920x1080 world) ---
+const BASE_H = 1080;
+let WORLD_W = 1920; // updated in resize() based on aspect ratio
+const WORLD_H = BASE_H;
+const view = { cssW: 0, cssH: 0, dpr: 1, scale: 1, offX: 0, offY: 0, camX: 0, camY: 0 };
+function setWorldTransform(){
+  // Draw in WORLD units, scaled to the actual screen.
+  // camX/camY define the top-left of the camera in WORLD coordinates (so zoom stays centered).
+  const tx = (view.offX - view.camX * view.scale);
+  const ty = (view.offY - view.camY * view.scale);
+  ctx.setTransform(
+    view.dpr * view.scale, 0,
+    0, view.dpr * view.scale,
+    view.dpr * tx, view.dpr * ty
+  );
+}
+
+
+const statusEl = document.getElementById('status');
+const menuEl = document.getElementById('menu');
+const controlsEl = document.getElementById('controls');
+const tabsEl = document.getElementById('tabs');
+const btnClose = document.getElementById('btnClose');
+const btnHitbox = document.getElementById('btnHitbox');
+const btnCopyConfig = document.getElementById('btnCopyConfig');
+const btnCopyHitboxes = document.getElementById('btnCopyHitboxes');
+const btnResetLocal = document.getElementById('btnResetLocal');
+
+const hbHUD = document.getElementById('hbHUD');
+const hbSpriteSel = document.getElementById('hbSprite');
+const hbPartsEl = document.getElementById('hbParts');
+const hbAddBtn = document.getElementById('hbAdd');
+const hbDelBtn = document.getElementById('hbDel');
+const hbShapeSel = document.getElementById('hbShape');
+const hbScaleEl = document.getElementById('hbScale');
+const hbOffXEl = document.getElementById('hbOffX');
+const hbOffYEl = document.getElementById('hbOffY');
+const hbRotEl = document.getElementById('hbRot');
+const hbApplyBtn = document.getElementById('hbApply');
+
+window.onerror = function(msg, src, line, col){
+  try {
+    showStatus(`JS ERROR\n${msg}\n${src||''}\nline ${line} col ${col}`, true);
+  } catch (e) {
+    // last resort
+    console.error('onerror handler failed', e);
+  }
+  return true;
+};
+
+if (typeof Matter === 'undefined'){
+  showStatus('Matter.js did not load (matter.min.js missing?)', true);
+  return;
+}
+
+const Engine = Matter.Engine;
+const Bodies = Matter.Bodies;
+const Body = Matter.Body;
+const Composite = Matter.Composite;
+const Events = Matter.Events;
+const Sleeping = Matter.Sleeping;
+
+/* ---------- Helpers ---------- */
+const clamp = (n, lo, hi) => (n < lo ? lo : (n > hi ? hi : n));
+const nowMs = () => (performance && performance.now) ? performance.now() : Date.now();
+const toNum = (v, fallback=0) => { const x = parseFloat(v); return Number.isFinite(x) ? x : fallback; };
+const rad = (deg) => deg * Math.PI / 180;
+const lerp = (a,b,t) => a + (b-a)*t;
+
+function hexToRgb(hex){
+  if (!hex) return {r:255,g:255,b:255};
+  hex = String(hex).trim();
+  if (hex[0]==='#') hex = hex.slice(1);
+  if (hex.length===3) hex = hex.split('').map(ch => ch+ch).join('');
+  if (hex.length!==6) return {r:255,g:255,b:255};
+  const r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+  if (!Number.isFinite(r)||!Number.isFinite(g)||!Number.isFinite(b)) return {r:255,g:255,b:255};
+  return {r,g,b};
+}
+function normalizeHex(s){
+  if (!s) return '#ffffff';
+  s = String(s).trim();
+  if (s[0] !== '#') s = '#'+s;
+  if (s.length===4) s = '#'+s[1]+s[1]+s[2]+s[2]+s[3]+s[3];
+  if (s.length!==7) return '#ffffff';
+  return s.toLowerCase();
+}
+
+function showStatus(text, force){
+  const show = !!force || (typeof CONFIG !== 'undefined' && CONFIG && CONFIG.view && CONFIG.view.debug);
+  statusEl.style.display = show ? 'block' : 'none';
+  if (show) statusEl.textContent = text;
+}
+
+function copyToClipboard(txt){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).catch(()=>{});
+  }
+}
+
+/* ---------- Resize ---------- */
+function resize(){
+  // CSS pixels
+  view.cssW = window.innerWidth;
+  view.cssH = window.innerHeight;
+
+  // HiDPI backing buffer
+  view.dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width  = Math.floor(view.cssW * view.dpr);
+  canvas.height = Math.floor(view.cssH * view.dpr);
+
+  // Dynamic world width: keep a constant WORLD_H so object scale is stable,
+  // but match the current screen aspect ratio so there is no forced 16:9 letterbox.
+  const aspect = (view.cssH > 0) ? (view.cssW / view.cssH) : (16/9);
+  WORLD_W = Math.max(320, Math.round(WORLD_H * aspect));
+
+  // ---- Camera / zoom ----
+  // We treat WORLD units as the physics world. The camera decides how many WORLD units
+  // fit on screen. This avoids breaking portrait/ultrawide and keeps object scale stable.
+  const zoomBaseH = (typeof CONFIG !== 'undefined' && CONFIG && CONFIG.view && Number.isFinite(+CONFIG.view.zoomBaseH))
+    ? +CONFIG.view.zoomBaseH
+    : WORLD_H;
+
+  const baseZoom = (typeof CONFIG !== 'undefined' && CONFIG && CONFIG.view && Number.isFinite(+CONFIG.view.zoom))
+    ? +CONFIG.view.zoom
+    : 1;
+
+  const dbgZoom = (typeof CONFIG !== 'undefined' && CONFIG && CONFIG.view && CONFIG.view.zoomOut)
+    ? (Number.isFinite(+CONFIG.view.debugZoomScale) ? +CONFIG.view.debugZoomScale : 0.9)
+    : 1;
+
+  // Clamp zooms to sane values.
+  const clampLocal = (n, lo, hi) => (n < lo ? lo : (n > hi ? hi : n));
+  const effZoom = clampLocal(baseZoom, 0.25, 3.0) * clampLocal(dbgZoom, 0.25, 3.0);
+
+  // Camera "virtual resolution": higher zoomBaseH = naturally zoomed-out camera.
+  // Zoom factor then scales around that base.
+  const cameraH = Math.max(120, zoomBaseH / Math.max(0.01, effZoom));
+  const cameraW = cameraH * aspect;
+
+  // Fit camera to screen (no forced 16:9 lock). Center if zoom shows outside.
+  view.scale = Math.min(view.cssW / cameraW, view.cssH / cameraH);
+  view.offX = (view.cssW - cameraW * view.scale) * 0.5;
+  view.offY = (view.cssH - cameraH * view.scale) * 0.5;
+
+
+  // Center the camera on the WORLD so zoom expands/contracts around the middle.
+  view.camX = (WORLD_W - cameraW) * 0.5;
+  view.camY = (WORLD_H - cameraH) * 0.5;
+
+  // World bounds changed -> rebuild colliders and recompute derived areas
+  if (state.engine) rebuildWalls();
+  recomputePitArea();
+}
+window.addEventListener('resize', resize);
+
+/* ---------- Sprites ---------- */
+const spriteNames = [
+  'circle1','circle2','circle3','circle4','circle5',
+  'circle6','circle7','circle8','circle9','circle10',
+  'square1',
+  // cubes (new)
+  'cube1','cube2','cube3','cube4','cube5','cube6','cube7','cube8','cube9','cube10'
+];
+
+const sprites = Object.create(null);
+let spritesOk = 0, spritesDone = 0;
+
+function loadAllSprites(done){
+  spritesOk=0; spritesDone=0;
+  for (const name of spriteNames){
+    const img = new Image();
+    img.onload = () => { spritesOk++; spritesDone++; if (spritesDone===spriteNames.length) done(); };
+    img.onerror = () => { spritesDone++; if (spritesDone===spriteNames.length) done(); };
+    img.src = name + '.png';
+    sprites[name]=img;
+  }
+}
+
+/* ---------- Config + persistence ---------- */
+const SAVE_KEY = 'orbit_ballpit_polished_v1';
+
+const CONFIG_DEFAULT = {
+  "view": {
+    "debug": false,
+    "drawHitboxes": false,
+    "drawPit": false,
+    "zoom": 1,
+    "zoomBaseH": 1080,
+    "zoomOut": false,
+    "debugZoomScale": 0.9
+  },
+  "menu": {
+    "x": 44,
+    "y": 10
+  },
+  "physics": {
+    "gravityY": 2.4,
+    "restitution": 0.08,
+    "friction": 0.3,
+    "frictionAir": 0.0018,
+    "density": 0.00001,
+    "maxAngularSpeed": 8,
+    "maxLinearSpeed": 50,
+    "wallThickness": 200,
+    "spinPush": 1,
+    "spinMin": 0.7,
+    "fixedStepHz": 120,
+    "maxSubSteps": 8
+  },
+  "spawning": {
+    "enabled": true,
+    "spawnMinSec": 0.5,
+    "spawnMaxSec": 1.1,
+    "sizeMinPct": 70,
+    "sizeMaxPct": 125
+  },
+  "cycle": {
+    "fillEnabled": true,
+    "pitRoofY": 0,
+    "fillCountLineY": -375,
+    "requiredFillPct": 93,
+    "packing": 900,
+    "minOrbsForFill": 24,
+    "maxOrbsCap": 3993,
+    "settleSpeed": 0.4,
+    "settleAngular": 1.02,
+    "settleRatio": 0.92,
+    "settleMinOrbs": 13,
+    "settleHoldMs": 10000,
+    "settleTimeoutMs": 15000,
+    "settleDampLandscape": 0.995,
+    "settleDampPortrait": 0.99,
+    "floorDropMs": 3500,
+    "despawnMarginPx": 400,
+    "resetTimeoutMs": 10000,
+    "cubePerCycleChance": 50,
+    "cubeDropFillPct": 59,
+    "cubeEnabled": true,
+    "settleSmoothMs": 2500,
+    "microSleepSpeed": 0.06,
+    "microSleepAngular": 0.06
+  },
+  "weights": {
+    "circles": {
+      "circle1": 8,
+      "circle2": 8,
+      "circle3": 8,
+      "circle4": 8,
+      "circle5": 8,
+      "circle6": 4,
+      "circle7": 6,
+      "circle8": 6,
+      "circle9": 6,
+      "circle10": 4
+    },
+    "squares": {
+      "square1": 3
+    },
+    "cubes": {
+      "cube1": 50,
+      "cube2": 25,
+      "cube3": 15,
+      "cube4": 35,
+      "cube5": 3,
+      "cube6": 35,
+      "cube7": 35,
+      "cube8": 30,
+      "cube9": 10,
+      "cube10": 35
+    }
+  },
+  "particles": {
+    "enabled": true,
+    "ratePerSec": 16,
+    "maxParticles": 500,
+    "fitToScreen": true,
+    "maxCoveragePct": 35,
+    "edgeOnly": false,
+    "speed": 115,
+    "speedVar": 18,
+    "angleDeg": 90,
+    "spreadDeg": 360,
+    "gravityY": -10,
+    "driftX": 0,
+    "life": 1.7,
+    "lifeVar": 0.8,
+    "startSize": 3,
+    "endSize": 0,
+    "startAlpha": 0.55,
+    "endAlpha": 0,
+    "startColor": "#ffffff",
+    "endColor": "#ffffff",
+    "additive": true,
+    "soft": false,
+    "jitter": 0.35,
+    "shape": "square",
+    "burstOnCycleStart": 0,
+    "burstOnDropStart": 0
+  },
+  "hitboxes": {
+    "circle1": [
+      {
+        "shape": "circle",
+        "size": 0.66,
+        "offX": 0.1,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle2": [
+      {
+        "shape": "circle",
+        "size": 0.66,
+        "offX": 0.4,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle3": [
+      {
+        "shape": "circle",
+        "size": 0.67,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle4": [
+      {
+        "shape": "circle",
+        "size": 0.66,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle5": [
+      {
+        "shape": "circle",
+        "size": 0.69,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle6": [
+      {
+        "shape": "circle",
+        "size": 0.71,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "circle7": [
+      {
+        "shape": "circle",
+        "size": 0.67,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": 28,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": -17,
+        "offY": 26.5,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": -17,
+        "offY": -26.5,
+        "rot": 0
+      }
+    ],
+    "circle8": [
+      {
+        "shape": "circle",
+        "size": 0.67,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": 28,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": -17,
+        "offY": 26.5,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.09,
+        "offX": -17,
+        "offY": -26.5,
+        "rot": 0
+      }
+    ],
+    "circle9": [
+      {
+        "shape": "circle",
+        "size": 0.69,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "square",
+        "size": 0.6,
+        "offX": 0,
+        "offY": 0,
+        "rot": 45
+      }
+    ],
+    "circle10": [
+      {
+        "shape": "circle",
+        "size": 0.69,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.1,
+        "offX": 21,
+        "offY": 21,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.1,
+        "offX": -21,
+        "offY": 21,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.1,
+        "offX": -21,
+        "offY": -21,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.1,
+        "offX": 21,
+        "offY": -21,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.15,
+        "offX": 0,
+        "offY": 26,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.15,
+        "offX": 0,
+        "offY": -26,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.15,
+        "offX": 26,
+        "offY": 0,
+        "rot": 0
+      },
+      {
+        "shape": "circle",
+        "size": 0.15,
+        "offX": -26,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "square1": [
+      {
+        "shape": "square",
+        "size": 0.63,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube1": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube2": [
+      {
+        "shape": "square",
+        "size": 0.67,
+        "offX": 0.3,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube3": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube4": [
+      {
+        "shape": "square",
+        "size": 0.67,
+        "offX": 0.3,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube5": [
+      {
+        "shape": "circle",
+        "size": 0.79,
+        "offX": 1,
+        "offY": 0.5,
+        "rot": 0
+      }
+    ],
+    "cube6": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube7": [
+      {
+        "shape": "square",
+        "size": 0.67,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube8": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube9": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ],
+    "cube10": [
+      {
+        "shape": "square",
+        "size": 0.7,
+        "offX": 0,
+        "offY": 0,
+        "rot": 0
+      }
+    ]
+  }
+};
+
+// Baseline used for % scaling of Wallpaper Engine sliders.
+const CONFIG_BASE = JSON.parse(JSON.stringify(CONFIG_DEFAULT));
+
+
+function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+function deepMerge(target, source){
+  for (const k in source){
+    if (!Object.prototype.hasOwnProperty.call(source,k)) continue;
+    const sv = source[k];
+    if (sv && typeof sv === 'object' && !Array.isArray(sv)){
+      if (!target[k] || typeof target[k] !== 'object') target[k] = {};
+      deepMerge(target[k], sv);
+    } else {
+      target[k] = sv;
+    }
+  }
+}
+
+let CONFIG = deepClone(CONFIG_DEFAULT);
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    deepMerge(CONFIG, parsed);
+  }catch(e){}
+}
+function saveLocal(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(CONFIG)); }catch(e){}
+}
+let saveTimer = null;
+function markDirty(){
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ saveTimer=null; saveLocal(); }, 250);
+}
+
+btnResetLocal.addEventListener('click', ()=>{
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  CONFIG = deepClone(CONFIG_DEFAULT);
+  initDefaultHitboxes();
+  applyMenuPos(true);
+  buildControls();
+  renderTabs();
+  markDirty();
+});
+
+/* Wallpaper Engine user properties hook (optional)
+   You can later add project.json properties to override CONFIG values.
+*/
+window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
+window.wallpaperPropertyListener.applyUserProperties = function(props){
+  try{
+    // Gate: let user disable WE overrides and just use in-file defaults/dev panel.
+    const enabled = props && props.enableCustomControls ? !!props.enableCustomControls.value : true;
+    if (!enabled) return;
+
+    const getProp = (...keys) => {
+      for (const k of keys){
+        if (props && Object.prototype.hasOwnProperty.call(props, k) && props[k] && props[k].value !== undefined) return props[k].value;
+      }
+      return undefined;
+    };
+    const hasProp = (...keys) => getProp(...keys) !== undefined;
+    const setBoolAny = (keys, fn) => {
+      const v = getProp(...keys);
+      if (v !== undefined) fn(!!v);
+    };
+
+    const setColorAny = (keys, fn) => {
+      const v = getProp(...keys);
+      if (!v) return;
+      // WE gives "r g b" (0..1)
+      const parts = String(v).trim().split(/\s+/).map(Number);
+      if (parts.length >= 3 && parts.every(x => Number.isFinite(x))) {
+        const r = clamp(Math.round(parts[0]*255),0,255);
+        const g = clamp(Math.round(parts[1]*255),0,255);
+        const b = clamp(Math.round(parts[2]*255),0,255);
+        fn('#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join(''));
+      }
+    };
+    // Raw slider (keep direct values for properties whose base is 0, or where 0 is important)
+    const setRawAny = (keys, fn) => {
+      const v = getProp(...keys);
+      if (v === undefined) return;
+      fn(toNum(v));
+    };
+
+    // Direct numeric slider (no % scaling)
+    const setNumAny = (keys, fn) => {
+      const v = getProp(...keys);
+      if (v === undefined) return;
+      fn(toNum(v));
+    };
+
+    // View
+    setBoolAny(['debugOverlay','debugoverlay'], v=>CONFIG.view.debug=v);
+    setBoolAny(['drawHitboxes','drawhitboxes'], v=>CONFIG.view.drawHitboxes=v);
+    setBoolAny(['drawPit','drawpit'], v=>CONFIG.view.drawPit=v);
+
+    // Camera zoom (direct values)
+    setNumAny(['viewzoom','viewZoom','zoom'], v=>{ CONFIG.view.zoom = v; resize(); });
+    setNumAny(['zoombaseh','zoomBaseH','zoomBaseHeight'], v=>{ CONFIG.view.zoomBaseH = v; resize(); });
+
+    // Debug zoom-out (toggle + scale)
+    setBoolAny(['debugZoomOut','debugzoomout','zoomOut'], v=>{ CONFIG.view.zoomOut=v; resize(); });
+    setNumAny(['debugzoomscale','debugZoomScale','zoomOutScale'], v=>{ CONFIG.view.debugZoomScale = v; resize(); });
+
+    // Physics (project.json uses lowercase keys like "gravityy", "frictionair", ...)
+    setNumAny(['gravityy','gravityY'], v=>{ CONFIG.physics.gravityY=v; if (state.engine) state.engine.gravity.y=v; });
+    setNumAny(['restitution'], v=>CONFIG.physics.restitution=v);
+    setNumAny(['friction'], v=>CONFIG.physics.friction=v);
+    setNumAny(['frictionair','frictionAir'], v=>CONFIG.physics.frictionAir=v);
+    setNumAny(['density'], v=>CONFIG.physics.density=v);
+    setNumAny(['maxlinearspeed','maxLinearSpeed'], v=>CONFIG.physics.maxLinearSpeed=v);
+    setNumAny(['maxangularspeed','maxAngularSpeed'], v=>CONFIG.physics.maxAngularSpeed=v);
+    setNumAny(['fixedstephz','fixedStepHz'], v=>CONFIG.physics.fixedStepHz=v);
+    setNumAny(['maxsubsteps','maxSubSteps'], v=>CONFIG.physics.maxSubSteps=v);
+    setNumAny(['wallthickness','wallThickness'], v=>{ CONFIG.physics.wallThickness=v; if (state.engine) rebuildWalls(); recomputePitArea(); });
+    setNumAny(['spinpush','spinPush'], v=>CONFIG.physics.spinPush=v);
+    setNumAny(['spinmin','spinMin'], v=>CONFIG.physics.spinMin=v);
+
+    // Spawning
+    setBoolAny(['spawningEnabled','spawningenabled'], v=>CONFIG.spawning.enabled=v);
+    setNumAny(['spawnminsec','spawnMinSec'], v=>CONFIG.spawning.spawnMinSec=v);
+    setNumAny(['spawnmaxsec','spawnMaxSec'], v=>CONFIG.spawning.spawnMaxSec=v);
+    setNumAny(['sizeminpct','sizeMinPct'], v=>CONFIG.spawning.sizeMinPct=v);
+    setNumAny(['sizemaxpct','sizeMaxPct'], v=>CONFIG.spawning.sizeMaxPct=v);
+
+    // Cycle
+    setBoolAny(['fillEnabled','fillenabled'], v=>CONFIG.cycle.fillEnabled=v);
+    setNumAny(['pitroofy','pitRoofY'], v=>{ CONFIG.cycle.pitRoofY=v; recomputePitArea(); });
+    setNumAny(['fillcountliney','fillCountLineY'], v=>{ CONFIG.cycle.fillCountLineY=v; });
+    setNumAny(['requiredfillpct','requiredFillPct'], v=>CONFIG.cycle.requiredFillPct=v);
+    setNumAny(['packing'], v=>CONFIG.cycle.packing=v);
+    setNumAny(['minorbsforfill','minOrbsForFill'], v=>CONFIG.cycle.minOrbsForFill=v);
+    setNumAny(['maxorbscap','maxOrbsCap'], v=>CONFIG.cycle.maxOrbsCap=v);
+
+    setNumAny(['settlespeed','settleSpeed'], v=>CONFIG.cycle.settleSpeed=v);
+    setNumAny(['settleangular','settleAngular'], v=>CONFIG.cycle.settleAngular=v);
+    setNumAny(['settleratio','settleRatio'], v=>CONFIG.cycle.settleRatio=v);
+    setNumAny(['settleminorbs','settleMinOrbs'], v=>CONFIG.cycle.settleMinOrbs=v);
+    setNumAny(['settleholdms','settleHoldMs'], v=>CONFIG.cycle.settleHoldMs=v);
+    setNumAny(['settletimeoutms','settleTimeoutMs'], v=>CONFIG.cycle.settleTimeoutMs=v);
+    setNumAny(['microsleepspeed','microSleepSpeed'], v=>CONFIG.cycle.microSleepSpeed=v);
+    setNumAny(['microsleepangular','microSleepAngular'], v=>CONFIG.cycle.microSleepAngular=v);
+    setNumAny(['settledamplandscape','settleDampLandscape'], v=>CONFIG.cycle.settleDampLandscape=v);
+    setNumAny(['settledampportrait','settleDampPortrait'], v=>CONFIG.cycle.settleDampPortrait=v);
+
+    setNumAny(['floordropms','floorDropMs'], v=>CONFIG.cycle.floorDropMs=v);
+    setNumAny(['despawnmarginpx','despawnMarginPx'], v=>CONFIG.cycle.despawnMarginPx=v);
+    setNumAny(['resettimeoutms','resetTimeoutMs'], v=>CONFIG.cycle.resetTimeoutMs=v);
+
+    // Cube
+    setBoolAny(['cubeEnabled','cubeenabled'], v=>CONFIG.cycle.cubeEnabled=v);
+    setNumAny(['cubepercyclechance','cubePerCycleChance'], v=>CONFIG.cycle.cubePerCycleChance=v);
+    setNumAny(['cubedropfillpct','cubeDropFillPct'], v=>CONFIG.cycle.cubeDropFillPct=v);
+
+    // Particles
+    setBoolAny(['particlesenabled','particlesEnabled'], v=>CONFIG.particles.enabled=v);
+    setNumAny(['particlerate','particleRate'], v=>CONFIG.particles.ratePerSec=v);
+    setNumAny(['maxparticles','maxParticles'], v=>CONFIG.particles.maxParticles=v);
+    setBoolAny(['particlesfittoscreen','particlesFitToScreen'], v=>CONFIG.particles.fitToScreen=v);
+    setNumAny(['particlesmaxcoveragepct','particlesMaxCoveragePct'], v=>CONFIG.particles.maxCoveragePct=v);
+    setBoolAny(['particlesEdgeOnly','particlesEdgeOnly','particlesedgeonly'], v=>CONFIG.particles.edgeOnly=v);
+
+    setNumAny(['particlespeed','particleSpeed'], v=>CONFIG.particles.speed=v);
+    setNumAny(['particlespeedvar','particleSpeedVar'], v=>CONFIG.particles.speedVar=v);
+    setNumAny(['particleangledeg','particleAngleDeg'], v=>CONFIG.particles.angleDeg=v);
+    setNumAny(['particlespreaddeg','particleSpreadDeg'], v=>CONFIG.particles.spreadDeg=v);
+
+    // These have base 0 or need signed/absolute control -> keep RAW
+    setRawAny(['particlegravityy','particleGravityY'], v=>CONFIG.particles.gravityY=v);
+    setRawAny(['particledriftx','particleDriftX'], v=>CONFIG.particles.driftX=v);
+
+    setNumAny(['particlelife','particleLife'], v=>CONFIG.particles.life=v);
+    setNumAny(['particlelifevar','particleLifeVar'], v=>CONFIG.particles.lifeVar=v);
+    setNumAny(['particlestartsize','particleStartSize'], v=>CONFIG.particles.startSize=v);
+
+    // base is 0 -> raw
+    setRawAny(['particleEndSize','particleendsize'], v=>CONFIG.particles.endSize=v);
+
+    setNumAny(['particlestartalpha','particleStartAlpha'], v=>CONFIG.particles.startAlpha=v);
+    // base is 0 -> raw
+    setRawAny(['particleendalpha','particleEndAlpha'], v=>CONFIG.particles.endAlpha=v);
+
+    setNumAny(['particlejitter','particleJitter'], v=>CONFIG.particles.jitter=v);
+    setColorAny(['particleStartColor','particlestartcolor'], v=>CONFIG.particles.startColor=v);
+    setColorAny(['particleEndColor','particleendcolor'], v=>CONFIG.particles.endColor=v);
+    setBoolAny(['particleAdditive','particleadditive'], v=>CONFIG.particles.additive=v);
+    setBoolAny(['particleSoft','particlesoft'], v=>CONFIG.particles.soft=v);
+    setBoolAny(['particleShapeCircle','particleshapecircle'], v=>CONFIG.particles.shape = v ? 'circle' : 'square');
+
+    // Burst defaults are 0 -> raw
+    setRawAny(['burstoncyclestart','burstOnCycleStart'], v=>CONFIG.particles.burstOnCycleStart=v);
+    setRawAny(['burstondropstart','burstOnDropStart'], v=>CONFIG.particles.burstOnDropStart=v);
+
+    // Weights (allow 0..300% scaling; 0 still supported)
+    const setWRaw = (key, obj, name) => {
+      const v = getProp(key);
+      if (v === undefined) return;
+      obj[name] = toNum(v);
+    };
+    for (const nm of ['circle1','circle2','circle3','circle4','circle5','circle6','circle7','circle8','circle9','circle10']){
+      setWRaw('w_'+nm, CONFIG.weights.circles, nm);
+    }
+    setWRaw('w_square1', CONFIG.weights.squares, 'square1');
+    for (let i=1;i<=10;i++){
+      const nm = 'cube'+i;
+      setWRaw('w_cube'+i, CONFIG.weights.cubes, nm);
+    }
+
+    // Apply immediately where needed
+    buildControls();
+    renderTabs();
+    showStatus('Wallpaper Engine properties applied.', true);
+  }catch(e){
+    showStatus('applyUserProperties error: '+e, true);
+  }
+};
+
+loadLocal();
+
+/* ---------- Hitbox data ---------- */
+function defaultHitboxFor(name){
+  const isSquare = name.startsWith('square') || name.startsWith('cube');
+  return [{ shape: isSquare ? 'square' : 'circle', size: isSquare ? 0.63 : 0.67, offX: 0, offY: 0, rot: 0 }];
+}
+
+function ensureHitboxes(name){
+  if (!CONFIG.hitboxes[name]) CONFIG.hitboxes[name] = defaultHitboxFor(name);
+  const arr = CONFIG.hitboxes[name];
+
+  // Back-compat: older object -> array
+  if (arr && !Array.isArray(arr)){
+    CONFIG.hitboxes[name] = [{
+      shape: (arr.shape==='square') ? 'square' : 'circle',
+      size: (arr.scale==null) ? 1 : arr.scale,
+      offX: arr.offsetX || 0,
+      offY: arr.offsetY || 0,
+      rot: arr.angleDeg || 0
+    }];
+  }
+
+  // Normalize entries
+  for (let i=0;i<CONFIG.hitboxes[name].length;i++){
+    const p = CONFIG.hitboxes[name][i] || (CONFIG.hitboxes[name][i] = {});
+    p.shape = (p.shape==='square' || p.shape==='triangle') ? p.shape : 'circle';
+    p.size = (p.size==null) ? 1 : toNum(p.size,1);
+    p.offX = toNum(p.offX,0);
+    p.offY = toNum(p.offY,0);
+    p.rot = toNum(p.rot,0);
+  }
+  if (CONFIG.hitboxes[name].length < 1) CONFIG.hitboxes[name].push(...defaultHitboxFor(name));
+  return CONFIG.hitboxes[name];
+}
+
+function initDefaultHitboxes(){
+  // Only initialize missing ones so user edits are preserved.
+  for (const nm of spriteNames){
+    ensureHitboxes(nm);
+  }
+
+  // Starter: arrow orb approximation (circle8) — circle + tip bump + mid fill
+  if (!CONFIG.hitboxes.circle8 || CONFIG.hitboxes.circle8.length === 1){
+    CONFIG.hitboxes.circle8 = [
+      { shape:'circle', size:0.67, offX:0, offY:0, rot:0 },
+      { shape:'circle', size:0.16, offX:26, offY:0, rot:0 },
+      { shape:'square', size:0.18, offX:16, offY:0, rot:0 }
+    ];
+  }
+}
+initDefaultHitboxes();
+
+/* ---------- State ---------- */
+const state = {
+  engine: null,
+  walls: [],
+  floorBody: null,
+  bodies: [],
+
+  pitArea: 1,
+  fillArea: 0,
+  fillPctRaw: 0,
+  fillPctPacked: 0,
+
+  cycle: 'FILL',
+  cycleTimer: 0,
+  cycleStartMs: 0,
+  settledMs: 0,
+
+  spawnTimer: 0,
+  nextSpawnMs: 1000,
+  spawnCapPause: false,
+
+  // cube plan per cycle
+  cubePlanned: null,      // e.g. 'cube3'
+  cubeSpawned: false,
+  cubeSpawnFillTarget: 0,
+
+  // hitbox editor
+  editMode: false,
+  editSpriteIndex: 0,
+  editPartIndex: 0,
+  dragging: false,
+
+  lastT: nowMs(),
+  fixedAccumulatorMs: 0,
+  paused: false,
+
+  // When fill has reached the configured threshold this cycle, newly spawned bodies can be culled
+  // if they are still above the pit roof and haven't touched the pile yet.
+  fillThresholdReached: false
+};
+
+// Debug/perf smoothing
+let dbgFps = 0;
+let dbgFpsSmooth = 0;
+let dbgFrameMsSmooth = 0;
+
+
+
+/* ---------- Pause on tab-out (prevents "jump" when returning) ---------- */
+function setPaused(p){
+  state.paused = !!p;
+  // Reset the timestep so we don't apply a big catch-up step on resume.
+  if (!state.paused) state.lastT = nowMs();
+  state.fixedAccumulatorMs = 0;
+}
+document.addEventListener('visibilitychange', ()=> setPaused(document.hidden));
+window.addEventListener('blur', ()=> setPaused(true));
+window.addEventListener('focus', ()=> setPaused(false));
+
+/* ---------- Menu: toggle + draggable ---------- */
+function applyMenuPos(fromConfig){
+  // if moved, we use explicit left/top
+  const x = fromConfig ? CONFIG.menu.x : parseFloat(menuEl.style.left);
+  const y = fromConfig ? CONFIG.menu.y : parseFloat(menuEl.style.top);
+  menuEl.style.left = (Number.isFinite(x) ? x : 18) + 'px';
+  menuEl.style.top  = (Number.isFinite(y) ? y : 18) + 'px';
+}
+applyMenuPos(true);
+
+function toggleMenu(force){
+  const open = (typeof force === 'boolean') ? force : (menuEl.style.display !== 'block');
+  menuEl.style.display = open ? 'block' : 'none';
+  // keep UI interactive even on desktop
+  canvas.style.pointerEvents = (open && !state.editMode) ? 'none' : 'auto';
+}
+btnClose.addEventListener('click', ()=>toggleMenu(false));
+
+window.addEventListener('keydown', (e)=>{
+  if (e.ctrlKey && (e.key.toLowerCase()==='m')){
+    e.preventDefault();
+    toggleMenu();
+  }
+});
+
+(function makeMenuDraggable(){
+  const header = document.getElementById('menuHeader');
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+
+  header.addEventListener('pointerdown', (e)=>{
+    if (menuEl.style.display !== 'block') return;
+    // Don't start dragging when clicking interactive controls in the header (fixes Close/Hitbox buttons)
+    if (e.target && e.target.closest && e.target.closest('button, input, select, textarea, a')) return;
+    dragging=true;
+    const r = menuEl.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY;
+    ox = r.left; oy = r.top;
+    header.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  header.addEventListener('pointermove', (e)=>{
+    if (!dragging) return;
+    let nx = ox + (e.clientX - sx);
+    let ny = oy + (e.clientY - sy);
+    const maxX = Math.max(0, window.innerWidth - 40);
+    const maxY = Math.max(0, window.innerHeight - 40);
+    nx = clamp(nx, 0, maxX);
+    ny = clamp(ny, 0, maxY);
+    menuEl.style.left = nx + 'px';
+    menuEl.style.top  = ny + 'px';
+  });
+
+  header.addEventListener('pointerup', ()=>{
+    if (!dragging) return;
+    dragging=false;
+    CONFIG.menu.x = parseFloat(menuEl.style.left) || CONFIG.menu.x;
+    CONFIG.menu.y = parseFloat(menuEl.style.top)  || CONFIG.menu.y;
+    markDirty();
+  });
+})();
+
+/* ---------- Tabs + control builders ---------- */
+const TAB_DEFS = [
+  { id:'cycle', label:'Cycle' },
+  { id:'physics', label:'Physics' },
+  { id:'distribution', label:'Distribution' },
+  { id:'particles', label:'Particles' },
+  { id:'view', label:'View/Debug' }
+];
+let activeTab = 'cycle';
+
+function renderTabs(){
+  tabsEl.innerHTML='';
+  for (const t of TAB_DEFS){
+    const el = document.createElement('div');
+    el.className = 'tab' + (activeTab===t.id ? ' active' : '');
+    el.textContent = t.label;
+    el.addEventListener('click', ()=>{
+      activeTab = t.id;
+      renderTabs();
+      buildControls();
+    });
+    tabsEl.appendChild(el);
+  }
+}
+
+function addSection(title){
+  const el = document.createElement('div');
+  el.className='section';
+  el.textContent=title;
+  controlsEl.appendChild(el);
+}
+function addSub(title){
+  const el = document.createElement('div');
+  el.className='sub';
+  el.textContent=title;
+  controlsEl.appendChild(el);
+}
+
+function makeRow(label, tip, controlNode, numberNode){
+  const row = document.createElement('div');
+  row.className='row';
+
+  const lab = document.createElement('label');
+  lab.textContent = label;
+  const help = document.createElement('span');
+  help.className='help';
+  help.textContent='?';
+  help.title = tip || '';
+  lab.appendChild(help);
+
+  const ctrl = document.createElement('div');
+  ctrl.className='ctrl';
+  ctrl.appendChild(controlNode);
+
+  row.appendChild(lab);
+  row.appendChild(ctrl);
+  if (numberNode){
+    row.appendChild(numberNode);
+  } else {
+    const spacer=document.createElement('div');
+    spacer.style.display='none';
+    row.appendChild(spacer);
+  }
+  controlsEl.appendChild(row);
+}
+
+function addNumber(label, tip, get, set){
+  const num = document.createElement('input');
+  num.type='number';
+  num.step='any';
+  num.value = String(get());
+
+  num.addEventListener('input', ()=>{
+    set(toNum(num.value, get()));
+    markDirty();
+  });
+
+  // a "fast drag" range: wide min/max but user can type anything
+  const range = document.createElement('input');
+  range.type='range';
+  range.min='-1000';
+  range.max='1000';
+  range.step='0.1';
+  range.value = String(clamp(get(), -1000, 1000));
+
+  range.addEventListener('input', ()=>{
+    const v = toNum(range.value, get());
+    set(v);
+    num.value = String(get());
+    markDirty();
+  });
+
+  // wheel accel
+  range.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const base = e.shiftKey ? 10 : 1;
+    const step = base * (e.altKey ? 0.1 : 1);
+    const dir = (e.deltaY > 0) ? -1 : 1;
+    const v = get() + dir*step;
+    set(v);
+    num.value = String(get());
+    range.value = String(clamp(get(), -1000, 1000));
+    markDirty();
+  }, {passive:false});
+
+  makeRow(label, tip, range, num);
+}
+
+function addCheckbox(label, tip, get, set){
+  const cb = document.createElement('input');
+  cb.type='checkbox';
+  cb.checked = !!get();
+  cb.addEventListener('input', ()=>{
+    set(!!cb.checked);
+    markDirty();
+  });
+  const spacer=document.createElement('div');
+  spacer.style.display='none';
+  makeRow(label, tip, cb, spacer);
+}
+
+function addColor(label, tip, get, set){
+  const col = document.createElement('input');
+  col.type='color';
+  col.value = normalizeHex(get());
+
+  const txt = document.createElement('input');
+  txt.type='text';
+  txt.value = normalizeHex(get());
+
+  col.addEventListener('input', ()=>{
+    const v = normalizeHex(col.value);
+    set(v);
+    txt.value=v;
+    markDirty();
+  });
+  txt.addEventListener('input', ()=>{
+    const v = normalizeHex(txt.value);
+    set(v);
+    col.value=v;
+    markDirty();
+  });
+
+  const wrap = document.createElement('div');
+  wrap.className='ctrl';
+  wrap.appendChild(col);
+
+  makeRow(label, tip, wrap, txt);
+}
+
+function addSelect(label, tip, options, get, set){
+  const sel = document.createElement('select');
+  for (const [value, text] of options){
+    const o = document.createElement('option');
+    o.value = value; o.textContent = text;
+    sel.appendChild(o);
+  }
+  sel.value = get();
+  sel.addEventListener('change', ()=>{
+    set(sel.value);
+    markDirty();
+  });
+  makeRow(label, tip, sel, null);
+}
+
+function buildControls(){
+  controlsEl.innerHTML='';
+
+  if (activeTab==='cycle'){
+    addSection('Cycle behavior');
+    addSub('Fill detection');
+    addCheckbox('Enable fill detection', 'If enabled, the cycle advances once the pit is filled enough.', ()=>CONFIG.cycle.fillEnabled, v=>CONFIG.cycle.fillEnabled=v);
+    addNumber('Pit roof Y', 'Top edge of the pit fill zone in pixels (negative = above screen).', ()=>CONFIG.cycle.pitRoofY, v=>CONFIG.cycle.pitRoofY=v);
+    addNumber('Fill count line Y', 'Objects only count toward fill once their center is BELOW this line (negative = above screen).', ()=>CONFIG.cycle.fillCountLineY, v=>CONFIG.cycle.fillCountLineY=v);
+    addNumber('Required fill %', 'Percent (0–100) of the effective pit area needed to enter SETTLE.', ()=>CONFIG.cycle.requiredFillPct, v=>CONFIG.cycle.requiredFillPct=v);
+    addNumber('Packing factor', 'Compensates for gaps between balls. Lower = needs more balls to count as filled.', ()=>CONFIG.cycle.packing, v=>CONFIG.cycle.packing=v);
+    addNumber('Min orbs for fill', 'Fill detection won\'t trigger before this many orbs exist.', ()=>CONFIG.cycle.minOrbsForFill, v=>CONFIG.cycle.minOrbsForFill=v);
+    addNumber('Max orbs cap', 'Failsafe: if orb count reaches this, force SETTLE.', ()=>CONFIG.cycle.maxOrbsCap, v=>CONFIG.cycle.maxOrbsCap=v);
+
+    addSub('Settle detection');
+    addNumber('Settle speed', 'Orb is considered settled if its speed is below this.', ()=>CONFIG.cycle.settleSpeed, v=>CONFIG.cycle.settleSpeed=v);
+    addNumber('Settle angular', 'Orb is considered settled if its spin is below this.', ()=>CONFIG.cycle.settleAngular, v=>CONFIG.cycle.settleAngular=v);
+    addNumber('Settle ratio', 'Fraction of orbs that must be settled before the hold timer counts (0–1).', ()=>CONFIG.cycle.settleRatio, v=>CONFIG.cycle.settleRatio=v);
+    addNumber('Settle min orbs', 'Do not run settle checks unless there are at least this many orbs.', ()=>CONFIG.cycle.settleMinOrbs, v=>CONFIG.cycle.settleMinOrbs=v);
+    addNumber('Settle hold ms', 'How long the pile must stay settled before dropping the floor.', ()=>CONFIG.cycle.settleHoldMs, v=>CONFIG.cycle.settleHoldMs=v);
+    addNumber('Settle timeout ms', 'Portrait/tall-screen failsafe: forces drop if SETTLE lasts too long.', ()=>CONFIG.cycle.settleTimeoutMs, v=>CONFIG.cycle.settleTimeoutMs=v);
+    addNumber('Micro-sleep speed', 'Very slow bodies under this speed can be hard-snapped asleep in SETTLE to kill near-full jitter.', ()=>CONFIG.cycle.microSleepSpeed, v=>CONFIG.cycle.microSleepSpeed=v);
+    addNumber('Micro-sleep angular', 'Angular threshold paired with Micro-sleep speed.', ()=>CONFIG.cycle.microSleepAngular, v=>CONFIG.cycle.microSleepAngular=v);
+
+    addSub('Drop / reset');
+    addNumber('Floor drop ms', 'How long the floor is removed so everything falls out.', ()=>CONFIG.cycle.floorDropMs, v=>CONFIG.cycle.floorDropMs=v);
+    addNumber('Despawn margin px', 'Remove bodies after they fall below the screen by this margin.', ()=>CONFIG.cycle.despawnMarginPx, v=>CONFIG.cycle.despawnMarginPx=v);
+    addNumber('Reset timeout ms', 'Failsafe: if something gets stuck, force next phase.', ()=>CONFIG.cycle.resetTimeoutMs, v=>CONFIG.cycle.resetTimeoutMs=v);
+
+    addSub('Cube per cycle (optional)');
+    addCheckbox('Enable cubes', 'If enabled, at most one cube spawns per cycle (with a per-cycle chance).', ()=>CONFIG.cycle.cubeEnabled, v=>CONFIG.cycle.cubeEnabled=v);
+        addNumber('Cube per-cycle chance', 'Chance (0..100) that a cube will be scheduled for this cycle.', ()=>CONFIG.cycle.cubePerCycleChance, v=>CONFIG.cycle.cubePerCycleChance=v);
+    addNumber('Cube spawn fill %', 'When the pit fill reaches this %, the scheduled cube is allowed to spawn (drops in as the next spawn).', ()=>CONFIG.cycle.cubeDropFillPct, v=>CONFIG.cycle.cubeDropFillPct=v);
+
+    addSub('Spawning');
+    addCheckbox('Spawning enabled', 'If disabled, stops spawning new objects (useful for debugging).', ()=>CONFIG.spawning.enabled, v=>CONFIG.spawning.enabled=v);
+    addNumber('Spawn min sec', 'Minimum delay between spawns.', ()=>CONFIG.spawning.spawnMinSec, v=>CONFIG.spawning.spawnMinSec=v);
+    addNumber('Spawn max sec', 'Maximum delay between spawns.', ()=>CONFIG.spawning.spawnMaxSec, v=>CONFIG.spawning.spawnMaxSec=v);
+    addNumber('Size min %', 'Minimum sprite size percent.', ()=>CONFIG.spawning.sizeMinPct, v=>CONFIG.spawning.sizeMinPct=v);
+    addNumber('Size max %', 'Maximum sprite size percent.', ()=>CONFIG.spawning.sizeMaxPct, v=>CONFIG.spawning.sizeMaxPct=v);
+
+    return;
+  }
+
+  if (activeTab==='physics'){
+    addSection('Physics');
+    addNumber('Gravity Y', 'Downward acceleration strength.', ()=>CONFIG.physics.gravityY, v=>CONFIG.physics.gravityY=v);
+    addNumber('Restitution', 'Bounciness (higher = more bounce).', ()=>CONFIG.physics.restitution, v=>CONFIG.physics.restitution=v);
+    addNumber('Friction', 'Surface grip between bodies.', ()=>CONFIG.physics.friction, v=>CONFIG.physics.friction=v);
+    addNumber('Air friction', 'Drag applied to motion and spin.', ()=>CONFIG.physics.frictionAir, v=>CONFIG.physics.frictionAir=v);
+    addNumber('Density', 'Mass scaling of bodies.', ()=>CONFIG.physics.density, v=>CONFIG.physics.density=v);
+    addNumber('Max linear speed', 'Clamps orb speed for stability. Set huge to effectively disable.', ()=>CONFIG.physics.maxLinearSpeed, v=>CONFIG.physics.maxLinearSpeed=v);
+    addNumber('Max angular speed', 'Clamps spin for stability. Set huge to effectively disable.', ()=>CONFIG.physics.maxAngularSpeed, v=>CONFIG.physics.maxAngularSpeed=v);
+    addNumber('Physics Hz', 'Fixed Matter.js simulation rate. Higher is smoother/more stable in dense piles but costs more CPU. Rendering still runs at your monitor refresh.', ()=>CONFIG.physics.fixedStepHz, v=>CONFIG.physics.fixedStepHz=v);
+    addNumber('Max substeps', 'Maximum physics catch-up steps per rendered frame. Prevents dense scenes from spiraling into huge CPU spikes.', ()=>CONFIG.physics.maxSubSteps, v=>CONFIG.physics.maxSubSteps=v);
+    addNumber('Wall thickness', 'Thickness of invisible walls/floor in pixels.', ()=>CONFIG.physics.wallThickness, v=>CONFIG.physics.wallThickness=v);
+    addNumber('Spin push', 'Adds sideways velocity when spinning hits the floor (fun chaos knob).', ()=>CONFIG.physics.spinPush, v=>CONFIG.physics.spinPush=v);
+    addNumber('Spin min', 'Minimum spin needed to activate spin push.', ()=>CONFIG.physics.spinMin, v=>CONFIG.physics.spinMin=v);
+    addSub('Settle damping');
+    addNumber('Damp (landscape)', 'Velocity multiplier per frame during SETTLE (closer to 1 = weaker).', ()=>CONFIG.cycle.settleDampLandscape, v=>CONFIG.cycle.settleDampLandscape=v);
+    addNumber('Damp (portrait)', 'Portrait velocity multiplier during SETTLE (stronger damping helps tall screens settle).', ()=>CONFIG.cycle.settleDampPortrait, v=>CONFIG.cycle.settleDampPortrait=v);
+    return;
+  }
+
+  if (activeTab==='distribution'){
+    addSection('Spawn weights (independent)');
+    const note = document.createElement('div');
+    note.className='small';
+    note.textContent =
+      'These weights are NOT auto-normalized. Setting one weight does not change any others. '+
+      '0 means never. Any positive value is relative chance among enabled entries.';
+    controlsEl.appendChild(note);
+
+    addSub('Circles');
+    for (const nm of Object.keys(CONFIG.weights.circles)){
+      addNumber(nm, 'Relative spawn weight for '+nm+'.', ()=>CONFIG.weights.circles[nm], v=>CONFIG.weights.circles[nm]=v);
+    }
+
+    addSub('Squares');
+    for (const nm of Object.keys(CONFIG.weights.squares)){
+      addNumber(nm, 'Relative spawn weight for '+nm+'.', ()=>CONFIG.weights.squares[nm], v=>CONFIG.weights.squares[nm]=v);
+    }
+
+    addSub('Cubes (pick which cube when a cube is scheduled)');
+    for (const nm of Object.keys(CONFIG.weights.cubes)){
+      addNumber(nm, 'Relative pick weight for '+nm+' when a cube spawns this cycle.', ()=>CONFIG.weights.cubes[nm], v=>CONFIG.weights.cubes[nm]=v);
+    }
+
+    return;
+  }
+
+  if (activeTab==='particles'){
+    addSection('Particles');
+    addCheckbox('Enabled', 'Toggle background particles.', ()=>CONFIG.particles.enabled, v=>CONFIG.particles.enabled=v);
+    addNumber('Rate per sec', 'Particles created per second.', ()=>CONFIG.particles.ratePerSec, v=>CONFIG.particles.ratePerSec=v);
+    addNumber('Max particles', 'Hard cap for performance.', ()=>CONFIG.particles.maxParticles, v=>CONFIG.particles.maxParticles=v);
+
+    addSub('Fit to screen');
+    addCheckbox('Fit to screen', 'If enabled: particles spawn across the screen instead of a radius.', ()=>CONFIG.particles.fitToScreen, v=>CONFIG.particles.fitToScreen=v);
+    addNumber('Max coverage %', 'Approximate maximum % of the screen occupied by particles.', ()=>CONFIG.particles.maxCoveragePct, v=>CONFIG.particles.maxCoveragePct=v);
+    addCheckbox('Edge only', 'If enabled: spawns only near the screen edges (still screen-fit).', ()=>CONFIG.particles.edgeOnly, v=>CONFIG.particles.edgeOnly=v);
+
+    addSub('Motion');
+    addNumber('Speed', 'Base speed in px/sec.', ()=>CONFIG.particles.speed, v=>CONFIG.particles.speed=v);
+    addNumber('Speed var', 'Random +/- speed variation.', ()=>CONFIG.particles.speedVar, v=>CONFIG.particles.speedVar=v);
+    addNumber('Angle deg', 'Direction. 90 = up, 270 = down.', ()=>CONFIG.particles.angleDeg, v=>CONFIG.particles.angleDeg=v);
+    addNumber('Spread deg', 'Emission cone width.', ()=>CONFIG.particles.spreadDeg, v=>CONFIG.particles.spreadDeg=v);
+    addNumber('Gravity Y', 'Vertical acceleration for particles.', ()=>CONFIG.particles.gravityY, v=>CONFIG.particles.gravityY=v);
+    addNumber('Drift X', 'Horizontal acceleration for particles.', ()=>CONFIG.particles.driftX, v=>CONFIG.particles.driftX=v);
+
+    addSub('Life & look');
+    addNumber('Life', 'Base lifetime in seconds.', ()=>CONFIG.particles.life, v=>CONFIG.particles.life=v);
+    addNumber('Life var', 'Random +/- lifetime variation.', ()=>CONFIG.particles.lifeVar, v=>CONFIG.particles.lifeVar=v);
+    addNumber('Start size', 'Size at birth (px).', ()=>CONFIG.particles.startSize, v=>CONFIG.particles.startSize=v);
+    addNumber('End size', 'Size at death (px).', ()=>CONFIG.particles.endSize, v=>CONFIG.particles.endSize=v);
+    addNumber('Start alpha', 'Opacity at birth (0..1).', ()=>CONFIG.particles.startAlpha, v=>CONFIG.particles.startAlpha=v);
+    addNumber('End alpha', 'Opacity at death (0..1).', ()=>CONFIG.particles.endAlpha, v=>CONFIG.particles.endAlpha=v);
+    addNumber('Jitter', 'Small randomness to reduce uniform motion.', ()=>CONFIG.particles.jitter, v=>CONFIG.particles.jitter=v);
+
+    addSub('Colors');
+    addColor('Start color', 'Hex color at birth.', ()=>CONFIG.particles.startColor, v=>CONFIG.particles.startColor=v);
+    addColor('End color', 'Hex color at death.', ()=>CONFIG.particles.endColor, v=>CONFIG.particles.endColor=v);
+
+    addSub('Render');
+    addCheckbox('Additive blend', 'Glow blending (lighter).', ()=>CONFIG.particles.additive, v=>CONFIG.particles.additive=v);
+    addCheckbox('Soft circles', 'Soft gradient when shape is circle.', ()=>CONFIG.particles.soft, v=>CONFIG.particles.soft=v);
+    addSelect('Shape', 'Particle primitive.', [['square','Square'],['circle','Circle']], ()=>CONFIG.particles.shape, v=>CONFIG.particles.shape=v);
+    addNumber('Burst on cycle start', 'Extra particles when a cycle starts.', ()=>CONFIG.particles.burstOnCycleStart, v=>CONFIG.particles.burstOnCycleStart=v);
+    addNumber('Burst on drop start', 'Extra particles when floor drops.', ()=>CONFIG.particles.burstOnDropStart, v=>CONFIG.particles.burstOnDropStart=v);
+
+    return;
+  }
+
+  if (activeTab==='view'){
+    addSection('View & debug');
+    addCheckbox('Debug overlay', 'Shows debug stats in the top-right.', ()=>CONFIG.view.debug, v=>CONFIG.view.debug=v);
+    addCheckbox('Draw hitboxes', 'Draw collider outlines for debugging.', ()=>CONFIG.view.drawHitboxes, v=>CONFIG.view.drawHitboxes=v);
+    addCheckbox('Draw pit zone', 'Draw the pit fill zone rectangle.', ()=>CONFIG.view.drawPit, v=>CONFIG.view.drawPit=v);
+
+    addSub('Camera');
+    addNumber('View zoom', '1.0 = normal. <1 zooms out (see more). >1 zooms in.', ()=>CONFIG.view.zoom, v=>{ CONFIG.view.zoom=v; resize(); });
+    addCheckbox('Debug zoom-out', 'Temporarily zooms out past the normal view so you can see off-screen behavior.', ()=>CONFIG.view.zoomOut, v=>{ CONFIG.view.zoomOut=v; resize(); buildControls(); });
+
+    // Only show the amount slider when the toggle is ON (keeps the menu tidy).
+    if (CONFIG.view.zoomOut){
+      addNumber('Zoom-out amount', 'Lower = further out. Typical: 0.8–0.95. (1.0 = no extra zoom.)', ()=>CONFIG.view.zoomOutScale, v=>{ CONFIG.view.debugZoomScale = v; resize(); });
+    }
+
+    const help = document.createElement('div');
+    help.className='small';
+    help.textContent = 'Menu toggle: Ctrl+M. Hitbox editor is a developer tool (bottom-center panel).';
+    controlsEl.appendChild(help);
+    return;
+  }
+}
+
+renderTabs();
+buildControls();
+
+/* ---------- Hitbox editor UI ---------- */
+function refreshHbSpriteList(){
+  hbSpriteSel.innerHTML='';
+  // editor focuses on spawnable visuals (circles/squares/cubes)
+  for (const nm of spriteNames){
+    const o=document.createElement('option');
+    o.value=nm; o.textContent=nm;
+    hbSpriteSel.appendChild(o);
+  }
+  hbSpriteSel.value = spriteNames[state.editSpriteIndex] || spriteNames[0];
+}
+
+function refreshHbParts(){
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  state.editPartIndex = clamp(state.editPartIndex|0, 0, arr.length-1);
+
+  hbPartsEl.innerHTML='';
+  for (let i=0;i<arr.length;i++){
+    const p=document.createElement('div');
+    p.className='pill' + (i===state.editPartIndex ? ' active' : '');
+    p.textContent = `Hitbox ${i+1}`;
+    p.addEventListener('click', ()=>{
+      state.editPartIndex=i;
+      refreshHbParts();
+      syncHbFields();
+    });
+    hbPartsEl.appendChild(p);
+  }
+
+  hbDelBtn.disabled = (arr.length <= 1);
+}
+
+function syncHbFields(){
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  const part = arr[state.editPartIndex];
+
+  hbShapeSel.value = part.shape;
+  hbScaleEl.value = String(part.size);
+  hbOffXEl.value = String(part.offX);
+  hbOffYEl.value = String(part.offY);
+  hbRotEl.value = String(part.rot);
+}
+
+function setEditMode(on){
+  state.editMode = !!on;
+  hbHUD.style.display = state.editMode ? 'block' : 'none';
+  canvas.style.pointerEvents = state.editMode ? 'auto' : (menuEl.style.display==='block' ? 'none' : 'auto');
+  if (state.editMode){
+    refreshHbSpriteList();
+    refreshHbParts();
+    syncHbFields();
+  }
+}
+
+btnHitbox.addEventListener('click', ()=> setEditMode(!state.editMode));
+
+hbSpriteSel.addEventListener('change', ()=>{
+  const idx = spriteNames.indexOf(hbSpriteSel.value);
+  state.editSpriteIndex = idx >= 0 ? idx : 0;
+  state.editPartIndex = 0;
+  refreshHbParts();
+  syncHbFields();
+});
+
+hbAddBtn.addEventListener('click', ()=>{
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  // unlimited parts (as requested). still: keep it sane; big numbers may hurt performance.
+  const base = arr[state.editPartIndex] || {shape:'circle',size:0.2,offX:0,offY:0,rot:0};
+  arr.push({ shape: base.shape, size: Math.max(0.01, base.size*0.6), offX: base.offX + 10, offY: base.offY, rot: base.rot });
+  state.editPartIndex = arr.length-1;
+  refreshHbParts();
+  syncHbFields();
+  markDirty();
+});
+
+hbDelBtn.addEventListener('click', ()=>{
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  if (arr.length<=1) return;
+  arr.splice(state.editPartIndex, 1);
+  state.editPartIndex = clamp(state.editPartIndex, 0, arr.length-1);
+  refreshHbParts();
+  syncHbFields();
+  markDirty();
+});
+
+hbApplyBtn.addEventListener('click', ()=>{
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  const part = arr[state.editPartIndex];
+  part.shape = hbShapeSel.value;
+  part.size = toNum(hbScaleEl.value, part.size);
+  part.offX  = toNum(hbOffXEl.value, part.offX);
+  part.offY  = toNum(hbOffYEl.value, part.offY);
+  part.rot   = toNum(hbRotEl.value, part.rot);
+  refreshHbParts();
+  syncHbFields();
+  markDirty();
+});
+
+window.addEventListener('keydown', (e)=>{
+  if (!state.editMode) return;
+  if (e.key==='ArrowRight'){
+    state.editSpriteIndex = (state.editSpriteIndex + 1) % spriteNames.length;
+    hbSpriteSel.value = spriteNames[state.editSpriteIndex];
+    state.editPartIndex = 0;
+    refreshHbParts(); syncHbFields();
+  } else if (e.key==='ArrowLeft'){
+    state.editSpriteIndex = (state.editSpriteIndex - 1 + spriteNames.length) % spriteNames.length;
+    hbSpriteSel.value = spriteNames[state.editSpriteIndex];
+    state.editPartIndex = 0;
+    refreshHbParts(); syncHbFields();
+  }
+});
+
+window.addEventListener('wheel', (e)=>{
+  if (!state.editMode) return;
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  const part = arr[state.editPartIndex];
+
+  if (e.shiftKey){
+    part.rot = (part.rot || 0) + (e.deltaY * -0.1);
+  } else {
+    part.size = Math.max(0.001, (part.size || 1) + (e.deltaY * -0.001));
+  }
+  syncHbFields();
+  markDirty();
+},{passive:false});
+
+canvas.addEventListener('mousedown', ()=>{ if(state.editMode) state.dragging=true; });
+canvas.addEventListener('mouseup', ()=>{ if(state.editMode){ state.dragging=false; markDirty(); }});
+canvas.addEventListener('mouseleave', ()=>{ state.dragging=false; });
+canvas.addEventListener('mousemove', (e)=>{
+  if (!state.editMode || !state.dragging) return;
+  const nm = hbSpriteSel.value;
+  const arr = ensureHitboxes(nm);
+  const part = arr[state.editPartIndex];
+  // movementX/Y are in screen (CSS) pixels; convert to world units
+  const dx = (e.movementX || 0) / Math.max(0.0001, view.scale);
+  const dy = (e.movementY || 0) / Math.max(0.0001, view.scale);
+  part.offX += dx;
+  part.offY += dy;
+  syncHbFields();
+});
+
+/* ---------- Export buttons ---------- */
+btnCopyConfig.addEventListener('click', ()=>{
+  const txt = JSON.stringify(CONFIG, null, 2);
+  showStatus('COPIED FULL CONFIG JSON to clipboard (includes hitboxes, particles, weights, everything).', true);
+  copyToClipboard(txt);
+});
+btnCopyHitboxes.addEventListener('click', ()=>{
+  const txt = JSON.stringify(CONFIG.hitboxes, null, 2);
+  showStatus('COPIED HITBOX JSON to clipboard.\nPaste into your defaults if you want.', true);
+  copyToClipboard(txt);
+});
+
+/* ---------- Matter + world ---------- */
+function rebuildWalls(){
+  if (!state.engine) return;
+  for (const w of state.walls) Composite.remove(state.engine.world, w);
+  state.walls.length = 0;
+  state.floorBody = null;
+
+  const w = WORLD_W, h = WORLD_H;
+  const t = Math.max(20, toNum(CONFIG.physics.wallThickness, 200));
+
+  // NOTE: Walls must extend far above the spawn height, otherwise newly spawned
+  // bodies can escape sideways before they ever reach the pit.
+  const wallHeight = h * 10;
+  const wallCenterY = (h/2) - (h * 3);
+
+  const bottom = Bodies.rectangle(w/2, h + t/2, w*2, t, { isStatic:true });
+  bottom._isFloor = true;
+  state.floorBody = bottom;
+
+  const left  = Bodies.rectangle(-t/2, wallCenterY, t, wallHeight, { isStatic:true });
+  const right = Bodies.rectangle(w + t/2, wallCenterY, t, wallHeight, { isStatic:true });
+
+  state.walls.push(bottom, left, right);
+  Composite.add(state.engine.world, state.walls);
+}
+
+function initMatter(){
+  state.engine = Engine.create();
+  state.engine.enableSleeping = true;
+  state.engine.positionIterations = 6;
+  state.engine.velocityIterations = 4;
+  state.engine.constraintIterations = 2;
+  state.engine.gravity.y = toNum(CONFIG.physics.gravityY, 1);
+  rebuildWalls();
+
+  Events.on(state.engine, 'collisionStart', (ev)=>{
+    for (const pair of ev.pairs){
+      const bodyA = pair.bodyA;
+      const bodyB = pair.bodyB;
+      const A = (bodyA && bodyA.parent) ? bodyA.parent : bodyA;
+      const B = (bodyB && bodyB.parent) ? bodyB.parent : bodyB;
+
+      // unlock rotation on first collision (keeps spawn stable)
+      if (A && A._rotationLocked){
+        A._rotationLocked=false;
+        Body.setInertia(A, (A._savedInertia!==undefined)?A._savedInertia:A.inertia);
+      }
+      if (B && B._rotationLocked){
+        B._rotationLocked=false;
+        Body.setInertia(B, (B._savedInertia!==undefined)?B._savedInertia:B.inertia);
+      }
+
+      // mark bodies as having touched something (used to cull unseen falling spawns)
+      if (A && A._spriteName) A._hasCollided = true;
+      if (B && B._spriteName) B._hasCollided = true;
+
+      // spin push off the floor
+      let floor=null, mover=null;
+      if (bodyA && bodyA._isFloor){ floor=bodyA; mover=(bodyB && bodyB.parent)?bodyB.parent:bodyB; }
+      else if (bodyB && bodyB._isFloor){ floor=bodyB; mover=(bodyA && bodyA.parent)?bodyA.parent:bodyA; }
+
+      if (floor && mover && !mover.isStatic){
+        const wv = mover.angularVelocity || 0;
+        if (Math.abs(wv) > toNum(CONFIG.physics.spinMin, 0.15)){
+          Body.setVelocity(mover, { x: mover.velocity.x + (wv*toNum(CONFIG.physics.spinPush,0.25)), y: mover.velocity.y });
+        }
+      }
+    }
+  });
+}
+
+/* ---------- Cycle + fill detection ---------- */
+function recomputePitArea(){
+  const roofY = toNum(CONFIG.cycle.pitRoofY, -550);
+  const pitH = Math.max(1, WORLD_H - roofY);
+  state.pitArea = Math.max(1, WORLD_W * pitH);
+}
+
+function recomputeFillArea(){
+  const roofY = toNum(CONFIG.cycle.pitRoofY, -550);
+  const countLineY = toNum(CONFIG.cycle.fillCountLineY, 0);
+  const bottomY = WORLD_H;
+  const leftX = 0, rightX = WORLD_W;
+
+  let area = 0;
+  for (const b of state.bodies){
+    if (!b.bounds || !b.bounds.min || !b.bounds.max) continue;
+    if (b.bounds.max.y < roofY) continue;
+    // Don't count objects toward fill until their center crosses this line.
+    if (b.position && b.position.y < countLineY) continue;
+    if (b.bounds.min.y > bottomY) continue;
+    if (b.bounds.max.x < leftX) continue;
+    if (b.bounds.min.x > rightX) continue;
+    area += (b._colliderArea || 0);
+  }
+
+  state.fillArea = area;
+
+  // Raw fill = literal collider area / pit area (what most people expect as "% filled").
+  const pit = Math.max(0.0001, state.pitArea);
+  state.fillPctRaw = area / pit;
+
+  // Packed fill = raw fill adjusted by the packing estimate (useful for debug/calibration),
+  // but NOT used for triggering the cycle anymore.
+  const packing = Math.max(0.0001, toNum(CONFIG.cycle.packing, 0.72));
+  state.fillPctPacked = area / (pit * packing);
+}
+
+function shouldStartSettle(){
+  if (!CONFIG.cycle.fillEnabled) return false;
+  if (state.bodies.length < toNum(CONFIG.cycle.minOrbsForFill, 25)) return false;
+
+  // IMPORTANT: requiredFillPct is compared against RAW fill (visual fill),
+  // so "100%" means "actually full", independent of packing.
+  const req = Math.max(0, toNum(CONFIG.cycle.requiredFillPct, 92)) / 100;
+
+  // If we hit the cap, we *pause spawning* but we do NOT start settling early.
+  // (Early settle was the bug.)
+  const cap = toNum(CONFIG.cycle.maxOrbsCap, 4000);
+  state.spawnCapPause = (state.bodies.length >= cap);
+
+  return state.fillPctRaw >= req;
+}
+
+
+function removeFloor(){
+  if (!state.floorBody) return;
+  Composite.remove(state.engine.world, state.floorBody);
+  state.floorBody = null;
+}
+function restoreFloor(){
+  rebuildWalls();
+}
+
+function clearAll(){
+  for (const b of state.bodies) Composite.remove(state.engine.world, b);
+  state.bodies.length = 0;
+}
+
+function despawnFallen(){
+  const limit = WORLD_H + toNum(CONFIG.cycle.despawnMarginPx, 400);
+  for (let i=state.bodies.length-1;i>=0;i--){
+    const b = state.bodies[i];
+    if (b.position.y > limit){
+      Composite.remove(state.engine.world, b);
+      state.bodies.splice(i,1);
+    }
+  }
+}
+
+
+// When the pit is completely filled (>=100%), remove any newly spawned bodies that are
+// still above the visible area and have never collided with the pile.
+// This prevents "invisible" impacts on the pile after the top fill is off-screen.
+function cullUnseenFallingAtFull(){
+  // Best behavior: once the pit has reached the configured "Required fill %" threshold,
+  // any *newly spawned* bodies that are still above the pit roof and have NOT touched the pile yet
+  // will be removed. This prevents invisible late spawns from bumping the pile when the top is off-screen.
+  if (state.cycle !== 'FILL' && state.cycle !== 'SETTLE') return;
+
+  const thresholdPct = Math.max(0, toNum(CONFIG.cycle.requiredFillPct, 100)); // user-configured
+  const filledPct = state.fillPctRaw * 100;
+
+  if (filledPct >= thresholdPct) state.fillThresholdReached = true;
+  if (!state.fillThresholdReached) return;
+
+  // Use the same top line as your fill detection cutoff.
+  const roofY = toNum(CONFIG.cycle.pitRoofY, -80);
+
+  for (let i=state.bodies.length-1;i>=0;i--){
+    const b = state.bodies[i];
+    if (!b || b.isStatic) continue;
+
+    // If it's touched anything, it's "real" now.
+    if (b._hasCollided) continue;
+
+    // Still above the roof line => invisible / not part of the visible pile yet.
+    if (b.position.y < roofY){
+      Composite.remove(state.engine.world, b);
+      state.bodies.splice(i,1);
+    }
+  }
+}
+
+
+function startNewCycle(){
+  state.fillThresholdReached = false;
+  // decide cube at cycle start
+  state.cubePlanned = null;
+  state.cubeSpawned = false;
+  state.cubeSpawnFillTarget = 0;
+
+  if (CONFIG.cycle.cubeEnabled){
+    const chance = Math.max(0, toNum(CONFIG.cycle.cubePerCycleChance, 20)) / 100;
+    if (Math.random() < chance){
+      const pick = weightedPick(CONFIG.weights.cubes);
+      if (pick) {
+        state.cubePlanned = pick;
+        state.cubeSpawnFillTarget = Math.max(0, toNum(CONFIG.cycle.cubeDropFillPct, 88)) / 100;
+      }
+    }
+  }
+
+  state.cycle = 'FILL';
+  state.cycleTimer = 0;
+  state.settledMs = 0;
+  state.spawnTimer = 0;
+  state.nextSpawnMs = randomSpawnDelayMs();
+  state.spawnCapPause = false;
+  state.cycleStartMs = nowMs();
+
+  particleBurst(toNum(CONFIG.particles.burstOnCycleStart,0));
+}
+
+function beginSettle(){
+  state.cycle = 'SETTLE';
+  state.cycleTimer = 0;
+  state.settledMs = 0;
+  state.cycleStartMs = nowMs();
+}
+
+function beginDrop(){
+  // wake bodies so the drop looks natural even if they were sleeping during settle
+  for (const b of state.bodies){ if (b && !b.isStatic) Sleeping.set(b, false); }
+  removeFloor();
+  state.cycle = 'DROP';
+  state.cycleTimer = 0;
+  state.cycleStartMs = nowMs();
+  particleBurst(toNum(CONFIG.particles.burstOnDropStart,0));
+}
+
+function beginReset(){
+  state.cycle = 'RESET';
+  state.cycleTimer = 0;
+  state.cycleStartMs = nowMs();
+}
+
+function updateCycle(dtMs){
+  state.cycleTimer += dtMs;
+
+  if (state.cycle === 'FILL'){
+    if (shouldStartSettle()) beginSettle();
+
+    // ultra failsafe: if fill never ends, only settle if we're reasonably close to the target.
+    // Otherwise, restart the cycle timer instead of forcing SETTLE early.
+    const ultraMs = toNum(CONFIG.cycle.resetTimeoutMs, 10000) * 10;
+    if (ultraMs > 0 && (nowMs() - state.cycleStartMs) > ultraMs) {
+      const need = Math.max(0, toNum(CONFIG.cycle.requiredFillPct, 100)) / 100;
+      const nearFactor = 1.0; // must reach the target (no early settle)
+      if (state.fillPctRaw >= need * nearFactor) {
+        beginSettle();
+      } else {
+        state.cycleStartMs = nowMs(); // give it more time
+      }
+    }
+
+  } else if (state.cycle === 'SETTLE'){
+
+    // portrait failsafe timeout
+    const timeout = toNum(CONFIG.cycle.settleTimeoutMs, 45000);
+    if (timeout > 0 && state.cycleTimer >= timeout){
+      beginDrop();
+      return;
+    }
+
+    if (state.bodies.length < toNum(CONFIG.cycle.settleMinOrbs, 15)){
+      state.settledMs = 0;
+      return;
+    }
+
+    // mild damping to kill micro-jiggle; stronger on portrait/tall screens
+    // IMPORTANT: only apply settle damping *after* a body has crossed the Fill Count Line,
+    // so fresh spawns above the line don't "slow/freeze" mid-air.
+    const countLineY = toNum(CONFIG.cycle.fillCountLineY, 0);
+    const eligible = [];
+    for (const b of state.bodies){
+      if (!b || b.isStatic) continue;
+      if (b.position && b.position.y >= countLineY) eligible.push(b);
+    }
+
+    if (eligible.length < toNum(CONFIG.cycle.settleMinOrbs, 15)){
+      state.settledMs = 0;
+      return;
+    }
+
+    // Smoothly ramp settle influence in over settleSmoothMs (prevents visible "snap"/stutter).
+    const smoothMs = Math.max(1, toNum(CONFIG.cycle.settleSmoothMs, 2500));
+    const t = clamp(state.cycleTimer / smoothMs, 0, 1);
+
+    const isPortrait = view.cssH > view.cssW * 1.2;
+    const targetDamp = clamp(toNum(isPortrait ? CONFIG.cycle.settleDampPortrait : CONFIG.cycle.settleDampLandscape, 0.995), 0.90, 1.0);
+    const dampNow = 1 - (1 - targetDamp) * t;
+
+    // thresholds (used for both "count settled" and sleeping)
+    const vTh = Math.max(0, toNum(CONFIG.cycle.settleSpeed, 0.4));
+    const aTh = Math.max(0, toNum(CONFIG.cycle.settleAngular, 0.02));
+
+    // Apply damping gently. Once a body is slow enough, let Matter.js "sleep" it so it stops jittering.
+    for (const b of eligible){
+      if (b.isSleeping) continue;
+
+      Body.setVelocity(b, { x: b.velocity.x * dampNow, y: b.velocity.y * dampNow });
+      Body.setAngularVelocity(b, (b.angularVelocity||0) * dampNow);
+
+      if (t > 0.8){
+        const v = b.velocity;
+        const speed = Math.sqrt(v.x*v.x + v.y*v.y);
+        const av = Math.abs(b.angularVelocity||0);
+        if (speed < vTh && av < aTh){
+          Sleeping.set(b, true);
+        }
+      }
+    }
+
+    // count settled (only among eligible bodies)
+    let slow = 0;
+    const total = eligible.length;
+    for (const b of eligible){
+      const v = b.velocity;
+      const speed = Math.sqrt(v.x*v.x + v.y*v.y);
+      const av = Math.abs(b.angularVelocity||0);
+      if (speed < vTh && av < aTh) slow++;
+    }
+
+    const ratio = slow / Math.max(1,total);
+    const need = clamp(toNum(CONFIG.cycle.settleRatio, 0.92), 0, 1);
+
+    state.settledMs = (ratio >= need) ? (state.settledMs + dtMs) : 0;
+    if (state.settledMs >= toNum(CONFIG.cycle.settleHoldMs, 10000)){
+      beginDrop();
+    }
+
+  } else if (state.cycle === 'DROP'){
+
+    despawnFallen();
+    if (state.cycleTimer >= toNum(CONFIG.cycle.floorDropMs, 3500)){
+      beginReset();
+    }
+    if (nowMs() - state.cycleStartMs > toNum(CONFIG.cycle.resetTimeoutMs, 10000)){
+      beginReset();
+    }
+
+  } else if (state.cycle === 'RESET'){
+
+    despawnFallen();
+    if (state.bodies.length === 0 || state.cycleTimer > 800){
+      restoreFloor();
+      clearAll();
+      startNewCycle();
+    }
+  }
+}
+
+/* ---------- Distribution + spawning ---------- */
+function weightedPick(weightsObj){
+  let total = 0;
+  for (const k in weightsObj){
+    if (!Object.prototype.hasOwnProperty.call(weightsObj,k)) continue;
+    const w = toNum(weightsObj[k], 0);
+    if (w > 0) total += w;
+  }
+  if (total <= 0) return null;
+  let r = Math.random() * total;
+  for (const k in weightsObj){
+    if (!Object.prototype.hasOwnProperty.call(weightsObj,k)) continue;
+    const w = toNum(weightsObj[k], 0);
+    if (w <= 0) continue;
+    r -= w;
+    if (r <= 0) return k;
+  }
+  // fallback
+  return Object.keys(weightsObj)[0] || null;
+}
+
+function pickSpawnSprite(){
+  // If cube is planned and time has come, force it exactly once.
+  if (state.cubePlanned && !state.cubeSpawned && state.fillPctRaw >= (state.cubeSpawnFillTarget || 0)){
+    state.cubeSpawned = true;
+    return state.cubePlanned;
+  }
+
+  // otherwise pick from circles + squares weights
+  const pool = Object.assign({}, CONFIG.weights.circles, CONFIG.weights.squares);
+  const pick = weightedPick(pool);
+  // if everything is zero, fallback to circle1
+  return pick || 'circle1';
+}
+
+function randomSpawnDelayMs(){
+  const a = toNum(CONFIG.spawning.spawnMinSec, 0.5);
+  const b = toNum(CONFIG.spawning.spawnMaxSec, 1.0);
+  const min = Math.min(a,b), max = Math.max(a,b);
+  return Math.max(0, (Math.random()*(max-min)+min) * 1000);
+}
+
+/* ---------- Spawn body from sprite + hitboxes ---------- */
+function colliderAreaForPart(shape, rOrS){
+  if (shape === 'square'){
+    const s = rOrS;
+    return s*s;
+  }
+  if (shape === 'triangle'){
+    // Matter.Bodies.polygon uses radius = circumradius R.
+    // Equilateral triangle area = (9*sqrt(3)/4) * R^2
+    const R = rOrS;
+    return (9*Math.sqrt(3)/4) * R*R;
+  }
+  // circle
+  const r = rOrS;
+  return Math.PI*r*r;
+}
+
+function spawnBody(name){
+  const hbs = ensureHitboxes(name);
+
+  const img = sprites[name];
+  const base = (img && img.complete && img.naturalWidth) ? img.naturalWidth : 180;
+
+  const minP = toNum(CONFIG.spawning.sizeMinPct, 80);
+  const maxP = toNum(CONFIG.spawning.sizeMaxPct, 140);
+  const pct = minP + Math.random() * (maxP - minP);
+  const spriteScale = pct / 100.0;
+  const drawHalf = (base * spriteScale) / 2;
+
+  const x = Math.random() * WORLD_W;
+  const y = -(WORLD_H*3 + base + Math.random()*(WORLD_H*2));
+
+  const unitScale = (drawHalf*2) / 80.0; // editor units -> pixels (keeps your old workflow)
+
+  const anchor = Bodies.rectangle(x, y, 2, 2, { isSensor:true });
+  const parts = [anchor];
+  let area = 0;
+
+  for (const hb of hbs){
+    const ox = toNum(hb.offX,0) * unitScale;
+    const oy = toNum(hb.offY,0) * unitScale;
+    const size = toNum(hb.size,1);
+
+    if (hb.shape === 'square'){
+      const s = (drawHalf*2) * size;
+      parts.push(Bodies.rectangle(x+ox, y+oy, s, s, { angle: rad(toNum(hb.rot,0)) }));
+      area += colliderAreaForPart('square', s);
+    }
+    else if (hb.shape === 'triangle'){
+      const R = drawHalf * size;
+      parts.push(Bodies.polygon(x+ox, y+oy, 3, R, { angle: rad(toNum(hb.rot,0)) - (Math.PI*3/4) }));
+      area += colliderAreaForPart('triangle', R);
+    }
+    else {
+      const r = drawHalf * size;
+      parts.push(Bodies.circle(x+ox, y+oy, r));
+      area += colliderAreaForPart('circle', r);
+    }
+  }
+
+  const body = Body.create({
+    parts,
+    restitution: toNum(CONFIG.physics.restitution, 0.45),
+    friction: toNum(CONFIG.physics.friction, 0.18),
+    frictionAir: toNum(CONFIG.physics.frictionAir, 0.0005),
+    density: toNum(CONFIG.physics.density, 0.0001)
+  });
+
+  body._spriteName = name;
+  body._drawHalf = drawHalf;
+  body._colliderArea = area;
+
+  // Used for culling unseen falling spawns once the pit is considered \"filled\".
+  // We only cull bodies spawned after the threshold is reached.
+  body._hasCollided = false;
+  body._cullIfUnseen = state.fillThresholdReached;
+
+  // stabilize spawn: lock rotation until first collision
+  body._rotationLocked = true;
+  body._savedInertia = body.inertia;
+  Body.setInertia(body, Infinity);
+  Body.setAngularVelocity(body, 0);
+
+  Body.setAngle(body, Math.random()*Math.PI*2);
+  Body.setPosition(body, {x,y});
+
+  Composite.add(state.engine.world, body);
+  state.bodies.push(body);
+}
+
+/* ---------- Particles (screen-fit + coverage cap) ---------- */
+const particles = [];
+let pSpawnAcc = 0;
+
+function particleBurst(count){
+  if (!CONFIG.particles.enabled) return;
+  count = Math.max(0, Math.floor(toNum(count,0)));
+  for (let i=0;i<count;i++) spawnOneParticle(true);
+}
+
+function estimateCoverageCap(){
+  const pct = clamp(toNum(CONFIG.particles.maxCoveragePct, 35), 0, 100);
+  if (pct <= 0) return 0;
+  const screenArea = Math.max(1, WORLD_W*WORLD_H);
+  const avgSize = Math.max(0.5, (toNum(CONFIG.particles.startSize,3) + toNum(CONFIG.particles.endSize,0)) / 2);
+  const avgArea = (CONFIG.particles.shape==='circle') ? (Math.PI*avgSize*avgSize) : (4*avgSize*avgSize);
+  const capByCoverage = Math.floor((screenArea * (pct/100)) / Math.max(1, avgArea));
+  return Math.max(0, capByCoverage);
+}
+
+function spawnPointFitToScreen(){
+  const w = WORLD_W, h = WORLD_H;
+  if (!CONFIG.particles.edgeOnly){
+    return { x: Math.random()*w, y: Math.random()*h };
+  }
+  // edge-only: spawn within a margin band near edges
+  const band = Math.min(w,h) * 0.12;
+  const side = Math.floor(Math.random()*4);
+  if (side===0) return { x: Math.random()*w, y: Math.random()*band };           // top
+  if (side===1) return { x: Math.random()*w, y: h - Math.random()*band };       // bottom
+  if (side===2) return { x: Math.random()*band, y: Math.random()*h };           // left
+  return { x: w - Math.random()*band, y: Math.random()*h };                      // right
+}
+
+function spawnOneParticle(){
+  const P = CONFIG.particles;
+  if (!P.enabled) return;
+
+  const hardCap = Math.max(0, Math.floor(toNum(P.maxParticles, 500)));
+  const covCap = estimateCoverageCap();
+  const cap = Math.min(hardCap, covCap>0 ? covCap : hardCap);
+  if (particles.length >= cap) return;
+
+  const pos = P.fitToScreen ? spawnPointFitToScreen() : { x: WORLD_W/2, y: WORLD_H/2 };
+
+  const baseAng = rad(toNum(P.angleDeg, 90));
+  const spread  = rad(toNum(P.spreadDeg, 360));
+  const ang = baseAng + (Math.random()-0.5)*spread;
+
+  let sp = toNum(P.speed, 52) + (Math.random()*2-1)*toNum(P.speedVar, 18);
+  if (sp < 0) sp = 0;
+
+  const j = toNum(P.jitter, 0.35);
+  const jx = (Math.random()*2-1)*j*6;
+  const jy = (Math.random()*2-1)*j*6;
+
+  let life = toNum(P.life, 1.7) + (Math.random()*2-1)*toNum(P.lifeVar, 0.8);
+  if (life < 0.05) life = 0.05;
+
+  particles.push({
+    x: pos.x + jx, y: pos.y + jy,
+    vx: Math.cos(ang)*sp + jx,
+    vy: Math.sin(ang)*sp + jy,
+    ax: toNum(P.driftX, 0),
+    ay: toNum(P.gravityY, -10),
+    age: 0, life,
+    sz0: toNum(P.startSize, 3), sz1: toNum(P.endSize, 0),
+    a0: clamp(toNum(P.startAlpha, 0.55), 0, 1),
+    a1: clamp(toNum(P.endAlpha, 0), 0, 1),
+    c0: hexToRgb(P.startColor),
+    c1: hexToRgb(P.endColor)
+  });
+}
+
+function updateParticles(dt){
+  const P = CONFIG.particles;
+  if (!P.enabled) return;
+
+  pSpawnAcc += Math.max(0, toNum(P.ratePerSec, 16)) * dt;
+  while (pSpawnAcc >= 1){
+    pSpawnAcc -= 1;
+    spawnOneParticle();
+  }
+
+  for (let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.age += dt;
+    if (p.age >= p.life){ particles.splice(i,1); continue; }
+    p.vx += p.ax*dt;
+    p.vy += p.ay*dt;
+    p.x  += p.vx*dt;
+    p.y  += p.vy*dt;
+
+    // soft wrap
+    if (p.x < -50) p.x = WORLD_W + 50;
+    if (p.x > WORLD_W + 50) p.x = -50;
+    if (p.y < -50) p.y = WORLD_H + 50;
+    if (p.y > WORLD_H + 50) p.y = -50;
+  }
+
+  // trim if caps changed
+  const hardCap = Math.max(0, Math.floor(toNum(P.maxParticles, 500)));
+  const covCap = estimateCoverageCap();
+  const cap = Math.min(hardCap, covCap>0 ? covCap : hardCap);
+  while (particles.length > cap) particles.shift();
+}
+
+function drawParticles(){
+  const P = CONFIG.particles;
+  if (!P.enabled) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = P.additive ? 'lighter' : 'source-over';
+
+  for (const p of particles){
+    const t = clamp(p.age / p.life, 0, 1);
+    const sz = lerp(p.sz0, p.sz1, t);
+    const a  = lerp(p.a0, p.a1, t);
+    if (sz <= 0 || a <= 0) continue;
+
+    const c = {
+      r: Math.round(lerp(p.c0.r, p.c1.r, t)),
+      g: Math.round(lerp(p.c0.g, p.c1.g, t)),
+      b: Math.round(lerp(p.c0.b, p.c1.b, t)),
+    };
+
+    if (P.shape === 'circle'){
+      if (P.soft){
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz);
+        g.addColorStop(0, `rgba(${c.r},${c.g},${c.b},${a})`);
+        g.addColorStop(1, `rgba(${c.r},${c.g},${c.b},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x,p.y,sz,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${a})`;
+        ctx.beginPath(); ctx.arc(p.x,p.y,sz,0,Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${a})`;
+      const s = sz*2;
+      ctx.fillRect(p.x - s/2, p.y - s/2, s, s);
+    }
+  }
+
+  ctx.restore();
+}
+
+/* ---------- Drawing bodies ---------- */
+function drawPitDebug(){
+  const roofY = toNum(CONFIG.cycle.pitRoofY, -550);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, roofY, WORLD_W, WORLD_H - roofY);
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.font='12px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+  ctx.fillText('PIT FILL ZONE', 10, Math.max(16, roofY+16));
+  ctx.restore();
+}
+
+function drawFillCountLineDebug(){
+  const y = toNum(CONFIG.cycle.fillCountLineY, 0);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,220,60,0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(WORLD_W, y);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,220,60,0.95)';
+  ctx.font = '12px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+  ctx.fillText('FILL COUNT LINE', 10, y - 6);
+  ctx.restore();
+}
+
+function strokePart(part, isSelected){
+  ctx.save();
+  ctx.strokeStyle = isSelected ? 'rgba(0,255,127,0.95)' : 'rgba(0,255,127,0.55)';
+  ctx.lineWidth = isSelected ? 3 : 2;
+
+  if (part.circleRadius){
+    ctx.beginPath();
+    ctx.arc(part.position.x, part.position.y, part.circleRadius, 0, Math.PI*2);
+    ctx.stroke();
+  } else if (part.vertices){
+    const v = part.vertices;
+    ctx.beginPath();
+    ctx.moveTo(v[0].x, v[0].y);
+    for (let i=1;i<v.length;i++) ctx.lineTo(v[i].x, v[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBody(b){
+  const img = sprites[b._spriteName];
+  if (img && img.complete){
+    ctx.save();
+    ctx.translate(b.position.x, b.position.y);
+    ctx.rotate(b.angle);
+    ctx.drawImage(img, -b._drawHalf, -b._drawHalf, b._drawHalf*2, b._drawHalf*2);
+    ctx.restore();
+  }
+
+  if (CONFIG.view.drawHitboxes){
+    // skip part[0] because it's the tiny sensor anchor
+    for (let i=1;i<b.parts.length;i++){
+      strokePart(b.parts[i], false);
+    }
+  }
+}
+
+function drawEditorPreview(){
+  const nm = hbSpriteSel.value;
+  const img = sprites[nm];
+  const hbs = ensureHitboxes(nm);
+
+  const cx = WORLD_W/2, cy = WORLD_H/2;
+  const bigSize = Math.min(WORLD_W, WORLD_H) * 0.72;
+  const half = bigSize/2;
+
+  // sprite
+  if (img && img.complete){
+    ctx.drawImage(img, cx-half, cy-half, bigSize, bigSize);
+  } else {
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,.25)';
+    ctx.strokeRect(cx-half, cy-half, bigSize, bigSize);
+    ctx.restore();
+  }
+
+  // hitboxes
+  const unitScale = bigSize / 80.0;
+  for (let i=0;i<hbs.length;i++){
+    const hb = hbs[i];
+    const x = cx + hb.offX*unitScale;
+    const y = cy + hb.offY*unitScale;
+    const size = hb.size;
+
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rad(hb.rot||0));
+    const selected = (i===state.editPartIndex);
+
+    ctx.strokeStyle = selected ? 'rgba(0,255,127,0.95)' : 'rgba(0,255,127,0.55)';
+    ctx.lineWidth = selected ? 3 : 2;
+
+    if (hb.shape === 'square'){
+      const s = bigSize * size;
+      ctx.strokeRect(-s/2, -s/2, s, s);
+    } else if (hb.shape === 'triangle'){
+      const R = half * size;
+      ctx.beginPath();
+      for (let k=0;k<3;k++){
+        const a = -(Math.PI*3/4) + k*(Math.PI*2/3);
+        const px = Math.cos(a)*R;
+        const py = Math.sin(a)*R;
+        if (k===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      const r = half * size;
+      ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // text
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.font='16px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+  ctx.fillText(`Editing: ${nm} (hitboxes: ${hbs.length})`, 18, 28);
+  ctx.font='12px system-ui,Segoe UI,Roboto,Arial,sans-serif';
+  ctx.fillText('Tip: Add extra tiny boxes/circles/triangles where the sprite art sticks out.', 18, 48);
+  ctx.restore();
+}
+
+/* ---------- Main loop ---------- */
+function clampSpeeds(){
+  const maxV = Math.max(0, toNum(CONFIG.physics.maxLinearSpeed, 80));
+  const maxW = Math.max(0, toNum(CONFIG.physics.maxAngularSpeed, 8));
+  if (maxV === 0 && maxW === 0) return;
+
+  for (const b of state.bodies){
+    if (maxV > 0){
+      const v = b.velocity;
+      const sp = Math.sqrt(v.x*v.x + v.y*v.y);
+      if (sp > maxV){
+        const s = maxV / sp;
+        Body.setVelocity(b, { x: v.x*s, y: v.y*s });
+      }
+    }
+    if (maxW > 0){
+      const w = b.angularVelocity || 0;
+      if (Math.abs(w) > maxW){
+        Body.setAngularVelocity(b, Math.sign(w) * maxW);
+      }
+    }
+  }
+}
+
+function getFixedStepMs(){
+  const hz = clamp(toNum(CONFIG.physics.fixedStepHz, 120), 30, 240);
+  return 1000 / hz;
+}
+
+function updateSpawning(dtMs){
+  if (!(CONFIG.spawning.enabled && state.cycle === 'FILL' && !state.spawnCapPause)) return;
+  state.spawnTimer += dtMs;
+  if (state.spawnTimer >= state.nextSpawnMs){
+    state.spawnTimer = 0;
+    const nm = pickSpawnSprite();
+    spawnBody(nm);
+    state.nextSpawnMs = randomSpawnDelayMs();
+    state.spawnCapPause = false;
+  }
+}
+
+function microSleepCrowdedBodies(){
+  if (state.cycle !== 'SETTLE') return;
+  const vSnap = Math.max(0, toNum(CONFIG.cycle.microSleepSpeed, 0.06));
+  const aSnap = Math.max(0, toNum(CONFIG.cycle.microSleepAngular, 0.06));
+  if (vSnap <= 0 && aSnap <= 0) return;
+
+  const countLineY = toNum(CONFIG.cycle.fillCountLineY, 0);
+  for (const b of state.bodies){
+    if (!b || b.isStatic || b.isSleeping) continue;
+    if (b.position && b.position.y < countLineY) continue;
+    const v = b.velocity || {x:0,y:0};
+    const speed = Math.sqrt(v.x*v.x + v.y*v.y);
+    const av = Math.abs(b.angularVelocity || 0);
+    if (speed <= vSnap && av <= aSnap){
+      Body.setVelocity(b, {x:0, y:0});
+      Body.setAngularVelocity(b, 0);
+      Sleeping.set(b, true);
+    }
+  }
+}
+
+function stepSimulation(stepMs){
+  state.engine.gravity.y = toNum(CONFIG.physics.gravityY, 1);
+  Engine.update(state.engine, stepMs);
+
+  for (const b of state.bodies){
+    if (b._rotationLocked) Body.setAngularVelocity(b, 0);
+  }
+
+  clampSpeeds();
+  updateCycle(stepMs);
+  microSleepCrowdedBodies();
+  updateSpawning(stepMs);
+}
+
+function loop(){
+  const t = nowMs();
+  let dtMs = t - state.lastT;
+  if (dtMs > 50) dtMs = 50;
+  state.lastT = t;
+  if (state.paused) dtMs = 0;
+  const dt = dtMs / 1000;
+
+  // update derived
+  recomputePitArea();
+
+  // debug overlay (human readable)
+  // FPS smoothing (EMA)
+  if (dtMs > 0){
+    dbgFps = 1000 / dtMs;
+    const a = 0.08; // smoothing factor
+    dbgFpsSmooth = dbgFpsSmooth ? (dbgFpsSmooth + (dbgFps - dbgFpsSmooth) * a) : dbgFps;
+    dbgFrameMsSmooth = dbgFrameMsSmooth ? (dbgFrameMsSmooth + (dtMs - dbgFrameMsSmooth) * a) : dtMs;
+  }
+
+  // object breakdown + motion stats
+  let nCircles=0, nSquares=0, nCubes=0, nLocked=0;
+  let maxSpeed=0, avgSpeed=0, maxAng=0, avgAng=0;
+  const nBodies = state.bodies.length || 1;
+  for (const b of state.bodies){
+    const nm = b._spriteName || '';
+    if (nm.startsWith('cube')) nCubes++;
+    else if (nm.startsWith('square')) nSquares++;
+    else if (nm.startsWith('circle')) nCircles++;
+    if (b._rotationLocked) nLocked++;
+    const sp = b.speed || 0;
+    const ang = Math.abs(b.angularSpeed || 0);
+    if (sp > maxSpeed) maxSpeed = sp;
+    if (ang > maxAng) maxAng = ang;
+    avgSpeed += sp;
+    avgAng += ang;
+  }
+  avgSpeed /= nBodies;
+  avgAng /= nBodies;
+
+  const cubeInfo = CONFIG.cycle.cubeEnabled
+    ? (state.cubePlanned ? `${state.cubePlanned}${state.cubeSpawned ? ' (spawned)' : ''}` : 'none')
+    : 'disabled';
+
+  const fillNeed = toNum(CONFIG.cycle.requiredFillPct, 92);
+  const fillNow = Math.round(state.fillPctRaw * 1000) / 10;
+  const packedNow = Math.round(state.fillPctPacked * 1000) / 10;
+
+  const nextSpawnInMs = Math.max(0, (state.nextSpawnMs || 0) - (state.spawnTimer || 0));
+
+  const dbg =
+    `ORBIT Ball Pit — Debug\n`+
+    `\n[Performance]\n`+
+    `FPS: ${dbgFpsSmooth ? dbgFpsSmooth.toFixed(1) : '—'}  (frame ${dbgFrameMsSmooth ? dbgFrameMsSmooth.toFixed(1) : '—'} ms)\n`+
+    `Paused: ${state.paused ? 'YES' : 'no'}\n`+
+    `\n[Display]\n`+
+    `Screen: ${view.cssW}×${view.cssH}  DPR: ${view.dpr.toFixed(2)}\n`+
+    `Canvas: ${canvas.width}×${canvas.height}  Scale: ${view.scale.toFixed(4)}\n`+
+    `Zoom-out view: ${CONFIG.view.zoomOut ? 'ON' : 'off'}\n`+
+    `Letterbox: x=${view.offX.toFixed(1)}, y=${view.offY.toFixed(1)}\n`+
+    `\n[Objects]\n`+
+    `Total: ${state.bodies.length}  (circles ${nCircles}, squares ${nSquares}, cubes ${nCubes})\n`+
+    `Rotation-locked: ${nLocked}\n`+
+    `Speed: avg ${avgSpeed.toFixed(2)}  max ${maxSpeed.toFixed(2)}\n`+
+    `Angular: avg ${avgAng.toFixed(3)}  max ${maxAng.toFixed(3)}\n`+
+    `\n[Cycle]\n`+
+    `State: ${state.cycle}${state.cycle==='SETTLE' ? `  (settled ${Math.round(state.settledMs)} ms)` : ''}\n`+
+    `Fill: ${fillNow}% / need ${fillNeed}%\n`+
+    `Packed: ${packedNow}%  (packing ${toNum(CONFIG.cycle.packing, 0.72)})\n`+
+    `Pit roof Y: ${toNum(CONFIG.cycle.pitRoofY, -80)}\n`+
+    `Cube: ${cubeInfo}  (drop at ${toNum(CONFIG.cycle.cubeDropFillPct, 67)}%)\n`+
+    `\n[Spawning]\n`+
+    `Enabled: ${CONFIG.spawning.enabled ? 'yes' : 'NO'}\n`+
+    `Next spawn in: ${(nextSpawnInMs/1000).toFixed(2)} s\n`+
+    `Spawn interval: ${toNum(CONFIG.spawning.spawnMinSec,0.6)}–${toNum(CONFIG.spawning.spawnMaxSec,1.2)} s\n`+
+    `Size range: ${toNum(CONFIG.spawning.sizeMinPct,70)}–${toNum(CONFIG.spawning.sizeMaxPct,125)} %\n`+
+    `\n[Physics]\n`+
+    `GravityY: ${toNum(CONFIG.physics.gravityY,1.3)}  Restitution: ${toNum(CONFIG.physics.restitution,0.35)}\n`+
+    `Friction: ${toNum(CONFIG.physics.friction,0.18)}  Air: ${toNum(CONFIG.physics.frictionAir,0.0005)}\n`+
+    `Density: ${toNum(CONFIG.physics.density,0.0001)}\n`+
+    `Speed caps: linear ${toNum(CONFIG.physics.maxLinearSpeed,80)}, angular ${toNum(CONFIG.physics.maxAngularSpeed,8)}\n`+
+    `Physics: ${clamp(toNum(CONFIG.physics.fixedStepHz,120),30,240).toFixed(0)} Hz  max substeps ${Math.max(1, Math.floor(toNum(CONFIG.physics.maxSubSteps,8)))}\n`+
+    `\n[Particles]\n`+
+    `Enabled: ${CONFIG.particles.enabled ? 'yes' : 'NO'}  Count: ${particles.length}/${toNum(CONFIG.particles.maxParticles,500)}\n`+
+    `Rate: ${toNum(CONFIG.particles.ratePerSec,16)}/s  Coverage cap: ${toNum(CONFIG.particles.maxCoveragePct,35)}%\n`;
+
+  showStatus(dbg, false);
+
+  // clear frame (in backing-buffer pixels)
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // draw in WORLD units
+  setWorldTransform();
+
+  // particles behind
+  updateParticles(dt);
+  drawParticles();
+
+  // editor preview mode
+  if (state.editMode){
+    drawEditorPreview();
+    requestAnimationFrame(loop);
+    return;
+  }
+
+
+  if (!state.paused){
+    const stepMs = getFixedStepMs();
+    const maxSubSteps = Math.max(1, Math.floor(toNum(CONFIG.physics.maxSubSteps, 8)));
+    state.fixedAccumulatorMs += dtMs;
+
+    const maxAccum = stepMs * maxSubSteps;
+    if (state.fixedAccumulatorMs > maxAccum) state.fixedAccumulatorMs = maxAccum;
+
+    let steps = 0;
+    while (state.fixedAccumulatorMs >= stepMs && steps < maxSubSteps){
+      stepSimulation(stepMs);
+      state.fixedAccumulatorMs -= stepMs;
+      steps++;
+    }
+  }
+
+  recomputeFillArea();
+  cullUnseenFallingAtFull();
+
+  // debug pit
+  if (CONFIG.view.drawPit) drawPitDebug();
+  // fill count line (only shown with hitboxes)
+  if (CONFIG.view.drawHitboxes) drawFillCountLineDebug();
+
+  // draw objects
+  for (const b of state.bodies) drawBody(b);
+
+  requestAnimationFrame(loop);
+}
+
+/* ---------- Boot ---------- */
+resize();
+showStatus('Loading sprites...', true);
+
+loadAllSprites(()=>{
+  showStatus('Starting...', true);
+  initMatter();
+  startNewCycle();
+  requestAnimationFrame(loop);
+  showStatus('', false);
+});
+
+
+} catch(e){
+  __boot('FATAL ERROR (script stopped)\n\n' + (e && e.stack ? e.stack : e));
+}
+
+})();
+</script>
+</body>
+</html>
